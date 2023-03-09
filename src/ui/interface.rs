@@ -1,9 +1,8 @@
+use crate::ui::components;
 use std::{io::Stdout, sync::mpsc::Receiver};
 use std::io;
 use tui::{
-    layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style},
-    widgets::{Block, Borders, Paragraph}, Terminal,
+    layout::{Constraint, Direction, Layout}, Terminal,
     backend::CrosstermBackend,
 };
 use crossterm::event::{KeyCode, KeyEvent, DisableMouseCapture};
@@ -11,9 +10,15 @@ use crossterm::terminal::{enable_raw_mode, disable_raw_mode, LeaveAlternateScree
 use crossterm::execute;
 use super::input::Event;
 
-enum State {
-    Default,
-    Input,
+struct UiState{
+    searching: bool,
+    searchbar_content: String,
+}
+
+impl UiState {
+    fn new() -> UiState{
+        UiState { searching: false, searchbar_content: String::from("") }
+    }
 }
 
 pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>, io::Error> {
@@ -38,51 +43,36 @@ pub fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Re
 }
 
 pub fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>, rx: Receiver<Event<KeyEvent>>){
-    let mut current_state = State::Default;
-    let mut search = String::from("");
+    let mut ui_state = UiState::new();
     loop {
         terminal.draw(|f| {
             let size = f.size();
-
             let main_layout = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
                 .constraints([Constraint::Length(3), Constraint::Min(2)].as_ref())
                 .split(size);
 
-            let block = Block::default().title("mplayer").borders(Borders::ALL);
-            f.render_widget(block, size);
-
-            let searchbar_content = if matches!(current_state, State::Default) {
-                "Enter Search Term [s]"
-            } else {
-                search.as_str()
-            };
-            let searchbar = Paragraph::new(searchbar_content)
-                .style(Style::default().add_modifier(Modifier::ITALIC))
-                .block(Block::default().borders(Borders::ALL).title("Search"));
             let below_search_layout = Layout::default()
                 .direction(Direction::Horizontal)
                 .margin(1)
                 .constraints([Constraint::Length(30), Constraint::Min(2)].as_ref())
                 .split(main_layout[1]);
-            let side_menu = Paragraph::new("Albums")
-                .block(Block::default().borders(Borders::ALL).title("Libary"));
+            
 
-            let main_content = Paragraph::new("Lorem ipsum dolor sit amet.")
-                .block(Block::default().borders(Borders::ALL).title("Welcome"));
-            f.render_widget(searchbar, main_layout[0]);
-            f.render_widget(main_content, below_search_layout[1]);
-            f.render_widget(side_menu, below_search_layout[0])
+            f.render_widget(components::build_window_border(), size);
+            f.render_widget(components::build_searchbar(ui_state.searching, &ui_state.searchbar_content), main_layout[0]);
+            f.render_widget(components::build_main_window(), below_search_layout[1]);
+            f.render_widget(components::build_side_menu(), below_search_layout[0])
         }).unwrap();
-        if matches!(current_state, State::Default) {
+        if !ui_state.searching {
             match rx.recv().unwrap() {
                 Event::Input(event) => match event.code {
                     KeyCode::Char('q') => {
                         break;
                     }
                     KeyCode::Char('s') => {
-                        current_state = State::Input;
+                        ui_state.searching = true;
                     }
                     _ => {}
                 },
@@ -91,13 +81,13 @@ pub fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>, rx: R
         } else {
             match rx.recv().unwrap() {
                 Event::Input(event) => match event.code {
-                    KeyCode::Char(c) => search.push(c),
+                    KeyCode::Char(c) => ui_state.searchbar_content.push(c),
                     KeyCode::Backspace => {
-                        search.pop();
+                        ui_state.searchbar_content.pop();
                     }
                     KeyCode::Esc => {
-                        current_state = State::Default;
-                        search = String::from("");
+                        ui_state.searching = false;
+                        ui_state.searchbar_content.clear();
                     }
                     _ => {}
                 },
