@@ -13,11 +13,12 @@ use super::input::Event;
 struct UiState{
     searching: bool,
     searchbar_content: String,
+    quit: bool
 }
 
 impl UiState {
     fn new() -> UiState{
-        UiState { searching: false, searchbar_content: String::from("") }
+        UiState { searching: false, searchbar_content: String::from(""), quit: false }
     }
 }
 
@@ -44,7 +45,7 @@ pub fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Re
 
 pub fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>, rx: Receiver<Event<KeyEvent>>){
     let mut ui_state = UiState::new();
-    loop {
+    while !ui_state.quit {
         terminal.draw(|f| {
             let size = f.size();
 
@@ -56,35 +57,38 @@ pub fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>, rx: R
             f.render_widget(components::build_side_menu(), content_layout[0]);
             f.render_widget(components::build_main_window(), content_layout[1]);
         }).unwrap();
-        if !ui_state.searching {
-            match rx.recv().unwrap() {
-                Event::Input(event) => match event.code {
-                    KeyCode::Char('q') => {
-                        break;
-                    }
-                    KeyCode::Char('s') => {
-                        ui_state.searching = true;
-                    }
-                    _ => {}
-                },
-                Event::Tick => {}
-            }
-        } else {
-            match rx.recv().unwrap() {
-                Event::Input(event) => match event.code {
-                    KeyCode::Char(c) => ui_state.searchbar_content.push(c),
-                    KeyCode::Backspace => {
-                        ui_state.searchbar_content.pop();
-                    }
-                    KeyCode::Esc => {
-                        ui_state.searching = false;
-                        ui_state.searchbar_content.clear();
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-        }
+
+        // Handles keyboard input
+        match rx.recv().unwrap() {
+            Event::Input(event) => handle_input(event, &mut ui_state),
+            _ => {}
+        } 
     }
 
+}
+
+fn handle_input(input: KeyEvent, ui_state: &mut UiState){
+    // Match arm for inputting text
+    if ui_state.searching{
+        match input.code {
+            KeyCode::Char(c) => ui_state.searchbar_content.push(c),
+            KeyCode::Backspace => {
+                        ui_state.searchbar_content.pop();
+            }
+            KeyCode::Esc => {
+                ui_state.searching = false;
+                ui_state.searchbar_content.clear();
+            }
+            _ => {}
+
+        }
+    // Match arm for everything else
+    } else {
+        match input.code {
+            KeyCode::Char('q') => ui_state.quit = true,
+            KeyCode::Char('s') => ui_state.searching = true,
+            _ => {}
+
+       } 
+    }
 }
