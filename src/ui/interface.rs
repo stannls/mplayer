@@ -1,8 +1,8 @@
-use crate::ui::components;
+use crate::ui::{components, layout};
 use std::{io::Stdout, sync::mpsc::Receiver};
 use std::io;
 use tui::{
-    layout::{Constraint, Direction, Layout}, Terminal,
+    Terminal,
     backend::CrosstermBackend,
 };
 use crossterm::event::{KeyCode, KeyEvent, DisableMouseCapture};
@@ -47,23 +47,14 @@ pub fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>, rx: R
     loop {
         terminal.draw(|f| {
             let size = f.size();
-            let main_layout = Layout::default()
-                .direction(Direction::Vertical)
-                .margin(1)
-                .constraints([Constraint::Length(3), Constraint::Min(2)].as_ref())
-                .split(size);
 
-            let below_search_layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .margin(1)
-                .constraints([Constraint::Length(30), Constraint::Min(2)].as_ref())
-                .split(main_layout[1]);
+            let main_layout = layout::build_main_layout().split(size);
+            let content_layout = layout::build_content_layout().split(main_layout[1]);
             
-
             f.render_widget(components::build_window_border(), size);
             f.render_widget(components::build_searchbar(ui_state.searching, &ui_state.searchbar_content), main_layout[0]);
-            f.render_widget(components::build_main_window(), below_search_layout[1]);
-            f.render_widget(components::build_side_menu(), below_search_layout[0])
+            f.render_widget(components::build_side_menu(), content_layout[0]);
+            f.render_widget(components::build_main_window(), content_layout[1]);
         }).unwrap();
         if !ui_state.searching {
             match rx.recv().unwrap() {
