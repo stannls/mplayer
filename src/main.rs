@@ -13,7 +13,7 @@ async fn main() -> Result<(), io::Error> {
     let mut terminal = setup_terminal()?;
 
     // render the main interface
-    interface::render_interface(&mut terminal, rx);
+    interface::render_interface(&mut terminal, rx).await;
 
     // restore terminal
     interface::restore_terminal(&mut terminal)?;
