@@ -1,4 +1,5 @@
-use tui::widgets::{Block, Borders, Paragraph};
+
+use tui::{widgets::{Block, Borders, Paragraph, List, ListItem}, style::{Style, Modifier}};
 use crate::api::search::wrapper;
 
 pub fn build_window_border() -> Block<'static>{
@@ -21,11 +22,36 @@ pub fn build_searchbar(searching: &bool, searchbar_content: &String) -> Paragrap
         .block(Block::default().borders(Borders::all()).title("Search"))
 }
 
-pub fn build_result_box<T: wrapper::SearchEntity>(title: String, content: Vec<T>) -> Paragraph<'static>{
-    let text = content.into_iter()
-        .map(|f| f.display())
-        .map(|f| f + "\n")
-        .fold(String::from(""), |x, y| x + &y);
-    Paragraph::new(text)
-        .block(Block::default().borders(Borders::all()).title(title))
+pub fn build_result_box<T: wrapper::SearchEntity>(title: String, content: Vec<T>, focused_result: Option<usize>, displayable_results: usize) -> List<'static>{
+    match focused_result{
+        None => {
+            let items: Vec<ListItem> = content.into_iter()
+                .map(|f| ListItem::new(f.display()))
+                .collect();
+            List::new(items)
+                .block(Block::default().borders(Borders::all()).title(title))
+        },
+        Some(id) => {
+            if content.len()<1{
+                return List::new(vec![])
+                .block(Block::default().borders(Borders::all()).title(title));
+            }
+            let mut items: Vec<ListItem> = content[0..id]
+                .into_iter()
+                .map(|f| ListItem::new(f.display()))
+                .collect();
+            items.push(ListItem::new(content[id].display()).style(Style::default().add_modifier(Modifier::BOLD)));
+            items.append(&mut Vec::from_iter(content[id+1..]
+                        .into_iter()
+                        .map(|f| ListItem::new(f.display()))
+                ));
+            if id>displayable_results {
+                items.drain(0..id-displayable_results);
+            }
+            List::new(items)
+                .block(Block::default().borders(Borders::all()).title(title))
+
+        }
+    }
+    
 }

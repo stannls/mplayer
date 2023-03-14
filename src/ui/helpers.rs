@@ -2,6 +2,8 @@ use tokio::task;
 use crate::api::search::remote; 
 use crate::ui::interface::{UiState, MainWindowState};
 
+use super::interface::FocusedResult;
+
 pub(crate) async fn query_web(ui_state: &mut UiState){
     // Query up results first
     //
@@ -13,4 +15,18 @@ pub(crate) async fn query_web(ui_state: &mut UiState){
     ui_state.searching = false;
     ui_state.searchbar_content = String::from("");
     ui_state.main_window_state = MainWindowState::Results((albums.await.unwrap().unwrap(), artists.await.unwrap().unwrap(), titles.await.unwrap().unwrap()));
+}
+
+pub(crate) fn check_scroll_space_down(ui_state: &UiState) -> bool{
+    match ui_state.main_window_state.clone() {
+        MainWindowState::Results(elements) => {
+            match ui_state.focused_result {
+                FocusedResult::Song(id) => elements.2.len()-1>id,
+                FocusedResult::Artist(id) => elements.1.len()-1>id,
+                FocusedResult::Record(id) => elements.0.len()-1>id,
+                _ => false
+            }
+        },
+        _ => false
+    }
 }
