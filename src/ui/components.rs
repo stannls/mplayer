@@ -1,6 +1,8 @@
 
+use std::fmt::format;
+
 use tui::{widgets::{Block, Borders, Paragraph, List, ListItem}, style::{Style, Modifier}};
-use crate::api::search::wrapper;
+use crate::api::search::wrapper::{self, SearchEntity};
 
 pub fn build_window_border() -> Block<'static>{
     Block::default().title("mplayer").borders(Borders::ALL)
@@ -54,4 +56,19 @@ pub fn build_result_box<T: wrapper::SearchEntity>(title: String, content: Vec<T>
         }
     }
     
+}
+
+pub fn build_artist_focus() -> Paragraph<'static>{
+    return Paragraph::new("artist content")
+        .block(Block::default().borders(Borders::all()).title("artist name"));
+}
+
+pub fn build_song_focus() -> Paragraph<'static>{
+    return Paragraph::new("song content")
+        .block(Block::default().borders(Borders::all()).title("song name"));
+}
+
+pub fn build_record_focus() -> Paragraph<'static> {
+    return Paragraph::new("record content")
+        .block(Block::default().borders(Borders::all()).title("record name"));
 }

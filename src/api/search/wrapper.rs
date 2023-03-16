@@ -36,7 +36,7 @@ impl SearchEntity for Recording {
 
 #[derive(Clone)]
 pub struct Release{
-    data: release::Release,
+    pub data: release::Release,
 }
 
 impl Release {

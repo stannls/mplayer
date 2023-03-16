@@ -38,3 +38,4 @@ pub async fn search_titles(query: String) -> Result<Vec<wrapper::Release>, Error
         .collect();
     Ok(res)
 }
+

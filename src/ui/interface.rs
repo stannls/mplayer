@@ -24,7 +24,10 @@ pub(crate) struct UiState{
 #[derive(Clone)]
 pub(crate) enum MainWindowState {
     Welcome,
-    Results((Vec<Recording>, Vec<Artist>, Vec<Release>))
+    Results((Vec<Recording>, Vec<Artist>, Vec<Release>)),
+    SongFocus(Release),
+    ArtistFocus(Artist),
+    RecordFocus(Recording)
 }
 
 #[derive(Clone)]
@@ -77,8 +80,11 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
             f.render_widget(components::build_side_menu(), content_layout[0]);
 
             match ui_state.clone().main_window_state {
-                crate::ui::interface::MainWindowState::Welcome => f.render_widget(components::build_main_window(), content_layout[1]),
-                crate::ui::interface::MainWindowState::Results(t) => {
+                MainWindowState::Welcome => f.render_widget(components::build_main_window(), content_layout[1]),
+                MainWindowState::SongFocus(_) => f.render_widget(components::build_song_focus(), content_layout[1]),
+                MainWindowState::RecordFocus(_) => f.render_widget(components::build_record_focus(), content_layout[1]),
+                MainWindowState::ArtistFocus(_) => f.render_widget(components::build_artist_focus(), content_layout[1]),
+                MainWindowState::Results(t) => {
                     let scroll_value = match ui_state.focused_result {
                         FocusedResult::Song(t) | FocusedResult::Record(t) | FocusedResult::Artist(t) | FocusedResult::Playlist(t) => Some(t),
                         _ => None
@@ -89,7 +95,8 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                     f.render_widget(components::build_result_box(String::from("[A]rtist"), t.1, if matches!(ui_state.focused_result, FocusedResult::Artist(_)) {scroll_value} else {None}, displayable_results), result_layout[1]);
                     f.render_widget(components::build_result_box(String::from("[R]ecord"), t.0, if matches!(ui_state.focused_result, FocusedResult::Record(_)) {scroll_value} else {None}, displayable_results), result_layout[2]);
                     f.render_widget(components::build_result_box::<wrapper::Artist>(String::from("[P]laylist"), vec![], if matches!(ui_state.focused_result, FocusedResult::Playlist(_)) {scroll_value} else {None}, displayable_results), result_layout[3]);
-            }
+            },
+            _ => {}
         }
         }).unwrap();
 
@@ -138,6 +145,28 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState){
                 FocusedResult::Record(t) => if t>0 {ui_state.focused_result = FocusedResult::Record(t-1)},
                 FocusedResult::Artist(t) => if t>0 {ui_state.focused_result = FocusedResult::Artist(t-1)},
                 _ => {}
+            },
+            KeyCode::Enter => {
+                match ui_state.main_window_state.clone() { 
+                    MainWindowState::Results(r) => {
+                       match ui_state.focused_result {
+                           FocusedResult::Song(id) => {
+                               ui_state.focused_result = FocusedResult::None;
+                               ui_state.main_window_state = MainWindowState::SongFocus(r.2.get(id).unwrap().clone());    
+                           },
+                           FocusedResult::Record(id) => {
+                                ui_state.focused_result = FocusedResult::None;
+                                ui_state.main_window_state = MainWindowState::RecordFocus(r.0.get(id).unwrap().clone());
+                           },
+                           FocusedResult::Artist(id) => {
+                               ui_state.focused_result = FocusedResult::None;
+                               ui_state.main_window_state = MainWindowState::ArtistFocus(r.1.get(id).unwrap().clone());
+                           },
+                           _ => {}
+                       } 
+                    },
+                    _ => {}
+                }
             }
             _ => {}
 
