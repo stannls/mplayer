@@ -1,8 +1,8 @@
-use musicbrainz_rs::entity::{release, recording, artist};
+use musicbrainz_rs::entity::{release_group, recording, artist};
 
 #[derive(Clone)]
 pub struct Artist{
-    data: artist::Artist,
+    pub data: artist::Artist,
 }
 
 impl Artist {
@@ -19,7 +19,7 @@ impl SearchEntity for Artist {
 
 #[derive(Clone)]
 pub struct Recording{
-    data: recording::Recording,
+    pub data: recording::Recording,
 }
 
 impl Recording {
@@ -30,17 +30,21 @@ impl Recording {
 
 impl SearchEntity for Recording {
    fn display(&self) -> String {
-       format!("{} - {}", self.data.title, self.data.artist_credit.to_owned().unwrap().get(0).unwrap().name)
+       let disambiguation = match self.data.disambiguation.clone() {
+           Some(s) => format!(" ({})", s),
+           _ => format!("")
+       };
+       format!("{} - {}{}", self.data.title, self.data.artist_credit.to_owned().unwrap().get(0).unwrap().name, disambiguation)
    } 
 }
 
 #[derive(Clone)]
 pub struct Release{
-    pub data: release::Release,
+    pub data: release_group::ReleaseGroup,
 }
 
 impl Release {
-    pub fn new(release: release::Release) -> Release{
+    pub fn new(release: release_group::ReleaseGroup) -> Release{
         Release {data: release}
     }
 }

@@ -10,7 +10,7 @@ pub(crate) async fn query_web(ui_state: &mut UiState){
     // The cloning of the data is really ugly but I found no other way because of the async tasks
     let artists = task::spawn(remote::search_artists(ui_state.searchbar_content.to_owned()));
     let albums = task::spawn(remote::search_albums(ui_state.searchbar_content.to_owned()));
-    let titles = task::spawn(remote::search_titles(ui_state.searchbar_content.to_owned()));
+    let titles = task::spawn(remote::search_songs(ui_state.searchbar_content.to_owned()));
 
     ui_state.searching = false;
     ui_state.searchbar_content = String::from("");

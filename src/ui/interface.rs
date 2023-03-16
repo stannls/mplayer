@@ -1,5 +1,6 @@
 use crate::ui::{components, layout, helpers};
 use crate::api::search::wrapper::{Artist, Recording, Release, self};
+use crate::api::search::remote::{album_from_release_group, artist_by_id, release_group_by_id};
 use std::{io::Stdout, sync::mpsc::Receiver};
 use std::io;
 use tui::{
@@ -10,6 +11,7 @@ use crossterm::event::{KeyCode, KeyEvent, DisableMouseCapture};
 use crossterm::terminal::{enable_raw_mode, disable_raw_mode, LeaveAlternateScreen};
 use crossterm::execute;
 use super::input::Event;
+use musicbrainz_rs::entity::{release, artist};
 
 #[derive(Clone)]
 pub(crate) struct UiState{
@@ -18,17 +20,17 @@ pub(crate) struct UiState{
     quit: bool,
     pub(crate) main_window_state: MainWindowState,
     pub(crate) focused_result: FocusedResult,
-    last_search: Option<(Vec<Recording>, Vec<Artist>, Vec<Release>)>
+    last_search: Option<(Vec<Release>, Vec<Artist>, Vec<Recording>)>
 }
 
 
 #[derive(Clone)]
 pub(crate) enum MainWindowState {
     Welcome,
-    Results((Vec<Recording>, Vec<Artist>, Vec<Release>)),
-    SongFocus(Release),
-    ArtistFocus(Artist),
-    RecordFocus(Recording)
+    Results((Vec<Release>, Vec<Artist>, Vec<Recording>)),
+    SongFocus(Recording),
+    ArtistFocus(artist::Artist, Vec<release::Release>),
+    RecordFocus(release::Release)
 }
 
 #[derive(Clone)]
@@ -82,9 +84,9 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 
             match ui_state.clone().main_window_state {
                 MainWindowState::Welcome => f.render_widget(components::build_main_window(), content_layout[1]),
-                MainWindowState::SongFocus(_) => f.render_widget(components::build_song_focus(), content_layout[1]),
-                MainWindowState::RecordFocus(_) => f.render_widget(components::build_record_focus(), content_layout[1]),
-                MainWindowState::ArtistFocus(_) => f.render_widget(components::build_artist_focus(), content_layout[1]),
+                MainWindowState::SongFocus(s) => f.render_widget(components::build_song_focus(s), content_layout[1]),
+                MainWindowState::RecordFocus(r) => f.render_widget(components::build_record_focus(r), content_layout[1]),
+                MainWindowState::ArtistFocus(a, r) => f.render_widget(components::build_artist_focus(a, r), content_layout[1]),
                 MainWindowState::Results(t) => {
                     let scroll_value = match ui_state.focused_result {
                         FocusedResult::Song(t) | FocusedResult::Record(t) | FocusedResult::Artist(t) | FocusedResult::Playlist(t) => Some(t),
@@ -149,7 +151,7 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState){
             },
             KeyCode::Char('b') => {
                 match ui_state.main_window_state {
-                        MainWindowState::SongFocus(_) | MainWindowState::ArtistFocus(_) | MainWindowState::RecordFocus(_) => if matches!(ui_state.last_search, Some(_)) {
+                        MainWindowState::SongFocus(_) | MainWindowState::ArtistFocus(_, _) | MainWindowState::RecordFocus(_) => if matches!(ui_state.last_search, Some(_)) {
                             ui_state.main_window_state = MainWindowState::Results(ui_state.last_search.clone().unwrap());
                             ui_state.last_search = None;
                         },
@@ -168,12 +170,23 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState){
                            FocusedResult::Record(id) => {
                                 ui_state.focused_result = FocusedResult::None;
                                 ui_state.last_search = Some(r.clone());
-                                ui_state.main_window_state = MainWindowState::RecordFocus(r.0.get(id).unwrap().clone());
+                                ui_state.main_window_state = {
+                                    MainWindowState::RecordFocus(album_from_release_group(r.0.get(id).unwrap().clone().data).await)
+                                }
                            },
                            FocusedResult::Artist(id) => {
                                ui_state.focused_result = FocusedResult::None;
                                ui_state.last_search = Some(r.clone());
-                               ui_state.main_window_state = MainWindowState::ArtistFocus(r.1.get(id).unwrap().clone());
+                               let artist = artist_by_id(r.1.get(id).unwrap().clone().data.id).await;
+                               let mut albums = vec![];
+                               for a in artist.release_groups.as_ref().unwrap(){
+                                   let release_group = release_group_by_id(a.id.to_owned()).await;
+                                   match release_group {
+                                       Ok(r) => albums.push(album_from_release_group(r).await),
+                                       _ => {}
+                                   }
+                               }
+                               ui_state.main_window_state = MainWindowState::ArtistFocus(artist.to_owned(), albums);
                            },
                            _ => {}
                        } 
