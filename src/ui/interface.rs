@@ -18,6 +18,7 @@ pub(crate) struct UiState{
     quit: bool,
     pub(crate) main_window_state: MainWindowState,
     pub(crate) focused_result: FocusedResult,
+    last_search: Option<(Vec<Recording>, Vec<Artist>, Vec<Release>)>
 }
 
 
@@ -41,7 +42,7 @@ pub(crate) enum FocusedResult {
 
 impl UiState {
     fn new() -> UiState{
-        UiState { searching: false, searchbar_content: String::from(""), quit: false, main_window_state: MainWindowState::Welcome, focused_result: FocusedResult::None }
+        UiState { searching: false, searchbar_content: String::from(""), quit: false, main_window_state: MainWindowState::Welcome, focused_result: FocusedResult::None, last_search: None }
     }
 }
 
@@ -146,20 +147,32 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState){
                 FocusedResult::Artist(t) => if t>0 {ui_state.focused_result = FocusedResult::Artist(t-1)},
                 _ => {}
             },
+            KeyCode::Char('b') => {
+                match ui_state.main_window_state {
+                        MainWindowState::SongFocus(_) | MainWindowState::ArtistFocus(_) | MainWindowState::RecordFocus(_) => if matches!(ui_state.last_search, Some(_)) {
+                            ui_state.main_window_state = MainWindowState::Results(ui_state.last_search.clone().unwrap());
+                            ui_state.last_search = None;
+                        },
+                        _ => {}
+                }
+            }
             KeyCode::Enter => {
                 match ui_state.main_window_state.clone() { 
                     MainWindowState::Results(r) => {
                        match ui_state.focused_result {
                            FocusedResult::Song(id) => {
                                ui_state.focused_result = FocusedResult::None;
+                               ui_state.last_search = Some(r.clone());
                                ui_state.main_window_state = MainWindowState::SongFocus(r.2.get(id).unwrap().clone());    
                            },
                            FocusedResult::Record(id) => {
                                 ui_state.focused_result = FocusedResult::None;
+                                ui_state.last_search = Some(r.clone());
                                 ui_state.main_window_state = MainWindowState::RecordFocus(r.0.get(id).unwrap().clone());
                            },
                            FocusedResult::Artist(id) => {
                                ui_state.focused_result = FocusedResult::None;
+                               ui_state.last_search = Some(r.clone());
                                ui_state.main_window_state = MainWindowState::ArtistFocus(r.1.get(id).unwrap().clone());
                            },
                            _ => {}
