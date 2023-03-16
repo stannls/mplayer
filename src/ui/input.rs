@@ -1,8 +1,8 @@
+use crossterm::event::{self, KeyEvent};
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use std::time::{Duration, Instant};
 use std::thread;
-use crossterm::event::{self, KeyEvent};
+use std::time::{Duration, Instant};
 
 pub enum Event<I> {
     Input(I),
