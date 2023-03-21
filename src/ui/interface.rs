@@ -1,5 +1,5 @@
 use super::input::Event;
-use crate::api::search::remote::{album_from_release_group, artist_by_id, release_group_by_id};
+use crate::api::search::remote::{album_from_release_group, unique_releases};
 use crate::api::search::wrapper::{self, Artist, Recording, Release};
 use crate::ui::{components, helpers, layout};
 use crossterm::event::{DisableMouseCapture, KeyCode, KeyEvent};
@@ -9,6 +9,7 @@ use musicbrainz_rs::entity::{artist, release};
 use std::io;
 use std::{io::Stdout, sync::mpsc::Receiver};
 use tui::{backend::CrosstermBackend, Terminal};
+use musicbrainz_rs::entity::release_group::ReleaseGroup;
 
 #[derive(Clone)]
 pub(crate) struct UiState {
@@ -25,7 +26,7 @@ pub(crate) enum MainWindowState {
     Welcome,
     Results((Vec<Release>, Vec<Artist>, Vec<Recording>)),
     SongFocus(Recording),
-    ArtistFocus(artist::Artist, Vec<release::Release>),
+    ArtistFocus(artist::Artist, Vec<ReleaseGroup>),
     RecordFocus(release::Release),
 }
 
@@ -63,13 +64,13 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>, io::Error>
 
 pub fn restore_terminal(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-) -> Result<(), io::Error> {
+    ) -> Result<(), io::Error> {
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
-    )?;
+        )?;
     terminal.show_cursor()?;
     Ok(())
 }
@@ -77,7 +78,7 @@ pub fn restore_terminal(
 pub async fn render_interface(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     rx: Receiver<Event<KeyEvent>>,
-) {
+    ) {
     let mut ui_state = UiState::new();
     while !ui_state.quit {
         terminal
@@ -91,7 +92,7 @@ pub async fn render_interface(
                 f.render_widget(
                     components::build_searchbar(&ui_state.searching, &ui_state.searchbar_content),
                     main_layout[0],
-                );
+                    );
                 f.render_widget(components::build_side_menu(), content_layout[0]);
 
                 match ui_state.clone().main_window_state {
@@ -110,9 +111,9 @@ pub async fn render_interface(
                     MainWindowState::Results(t) => {
                         let scroll_value = match ui_state.focused_result {
                             FocusedResult::Song(t)
-                            | FocusedResult::Record(t)
-                            | FocusedResult::Artist(t)
-                            | FocusedResult::Playlist(t) => Some(t),
+                                | FocusedResult::Record(t)
+                                | FocusedResult::Artist(t)
+                                | FocusedResult::Playlist(t) => Some(t),
                             _ => None,
                         };
                         let result_layout = layout::build_search_layout(content_layout[1]);
@@ -127,9 +128,9 @@ pub async fn render_interface(
                                     None
                                 },
                                 displayable_results,
-                            ),
-                            result_layout[0],
-                        );
+                                ),
+                                result_layout[0],
+                                );
                         f.render_widget(
                             components::build_result_box(
                                 String::from("[A]rtist"),
@@ -140,9 +141,9 @@ pub async fn render_interface(
                                     None
                                 },
                                 displayable_results,
-                            ),
-                            result_layout[1],
-                        );
+                                ),
+                                result_layout[1],
+                                );
                         f.render_widget(
                             components::build_result_box(
                                 String::from("[R]ecord"),
@@ -153,9 +154,9 @@ pub async fn render_interface(
                                     None
                                 },
                                 displayable_results,
-                            ),
-                            result_layout[2],
-                        );
+                                ),
+                                result_layout[2],
+                                );
                         f.render_widget(
                             components::build_result_box::<wrapper::Artist>(
                                 String::from("[P]laylist"),
@@ -166,14 +167,14 @@ pub async fn render_interface(
                                     None
                                 },
                                 displayable_results,
-                            ),
-                            result_layout[3],
-                        );
+                                ),
+                                result_layout[3],
+                                );
                     }
                     _ => {}
                 }
             })
-            .unwrap();
+        .unwrap();
 
         // Handles keyboard input
         match rx.recv().unwrap() {
@@ -198,7 +199,7 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState) {
             KeyCode::Enter => helpers::query_web(ui_state).await,
             _ => {}
         }
-    // Match arm for everything else
+        // Match arm for everything else
     } else {
         match input.code {
             KeyCode::Char('q') => ui_state.quit = true,
@@ -206,27 +207,27 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState) {
             KeyCode::Char('A')
                 if matches!(ui_state.main_window_state, MainWindowState::Results(_))
                     && !matches!(ui_state.focused_result, FocusedResult::Artist(_)) =>
-            {
-                ui_state.focused_result = FocusedResult::Artist(0)
-            }
+                    {
+                        ui_state.focused_result = FocusedResult::Artist(0)
+                    }
             KeyCode::Char('S')
                 if matches!(ui_state.main_window_state, MainWindowState::Results(_))
                     && !matches!(ui_state.focused_result, FocusedResult::Song(_)) =>
-            {
-                ui_state.focused_result = FocusedResult::Song(0)
-            }
+                    {
+                        ui_state.focused_result = FocusedResult::Song(0)
+                    }
             KeyCode::Char('R')
                 if matches!(ui_state.main_window_state, MainWindowState::Results(_))
                     && !matches!(ui_state.focused_result, FocusedResult::Record(_)) =>
-            {
-                ui_state.focused_result = FocusedResult::Record(0)
-            }
+                    {
+                        ui_state.focused_result = FocusedResult::Record(0)
+                    }
             KeyCode::Char('P')
                 if matches!(ui_state.main_window_state, MainWindowState::Results(_))
                     && !matches!(ui_state.focused_result, FocusedResult::Playlist(_)) =>
-            {
-                ui_state.focused_result = FocusedResult::Playlist(0)
-            }
+                    {
+                        ui_state.focused_result = FocusedResult::Playlist(0)
+                    }
             KeyCode::Down => match ui_state.focused_result {
                 FocusedResult::Song(t) => {
                     if helpers::check_scroll_space_down(ui_state) {
@@ -265,14 +266,14 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState) {
             },
             KeyCode::Char('b') => match ui_state.main_window_state {
                 MainWindowState::SongFocus(_)
-                | MainWindowState::ArtistFocus(_, _)
-                | MainWindowState::RecordFocus(_) => {
-                    if matches!(ui_state.last_search, Some(_)) {
-                        ui_state.main_window_state =
-                            MainWindowState::Results(ui_state.last_search.clone().unwrap());
-                        ui_state.last_search = None;
+                    | MainWindowState::ArtistFocus(_, _)
+                    | MainWindowState::RecordFocus(_) => {
+                        if matches!(ui_state.last_search, Some(_)) {
+                            ui_state.main_window_state =
+                                MainWindowState::Results(ui_state.last_search.clone().unwrap());
+                            ui_state.last_search = None;
+                        }
                     }
-                }
                 _ => {}
             },
             KeyCode::Enter => match ui_state.main_window_state.clone() {
@@ -289,23 +290,14 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState) {
                         ui_state.main_window_state = {
                             MainWindowState::RecordFocus(
                                 album_from_release_group(r.0.get(id).unwrap().clone().data).await,
-                            )
+                                )
                         }
                     }
                     FocusedResult::Artist(id) => {
                         ui_state.focused_result = FocusedResult::None;
                         ui_state.last_search = Some(r.clone());
-                        let artist = artist_by_id(r.1.get(id).unwrap().clone().data.id).await;
-                        let mut albums = vec![];
-                        for a in artist.release_groups.as_ref().unwrap() {
-                            let release_group = release_group_by_id(a.id.to_owned()).await;
-                            match release_group {
-                                Ok(r) => albums.push(album_from_release_group(r).await),
-                                _ => {}
-                            }
-                        }
-                        ui_state.main_window_state =
-                            MainWindowState::ArtistFocus(artist.to_owned(), albums);
+                        let albums = unique_releases(r.1.get(id).unwrap().clone().data.id).await;
+                        ui_state.main_window_state = MainWindowState::ArtistFocus(r.1.get(id).unwrap().clone().data.to_owned(), albums);
                     }
                     _ => {}
                 },

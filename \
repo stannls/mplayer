@@ -1,4 +1,4 @@
-use crate::api::search::wrapper::{self, SearchEntity};
+use crate::api::search::wrapper;
 use chrono::Duration;
 use musicbrainz_rs::entity::{artist, release, release_group::ReleaseGroup};
 use tui::{

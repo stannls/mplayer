@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use crate::api::search::wrapper;
 use musicbrainz_rs::entity::artist::{Artist, ArtistSearchQuery};
 use musicbrainz_rs::entity::recording::{Recording, RecordingSearchQuery};
-use musicbrainz_rs::entity::release;
+use musicbrainz_rs::entity::release::{self, Release, ReleasePackaging};
 use musicbrainz_rs::entity::release_group::{ReleaseGroup, ReleaseGroupSearchQuery};
 use musicbrainz_rs::prelude::*;
 use reqwest::Error;
@@ -75,28 +77,11 @@ pub async fn album_from_release_group(release_group: ReleaseGroup) -> release::R
         .unwrap()
 }
 
-pub async fn release_group_by_id(id: String) -> Result<ReleaseGroup, Error> {
-    ReleaseGroup::fetch()
-        .id(id.as_str())
-        .with_release_group_relations()
-        .with_releases()
-        .with_annotations()
-        .with_series_relations()
-        .execute()
-        .await
-}
-
-pub async fn artist_by_id(id: String) -> Artist {
-    Artist::fetch()
-        .id(id.as_str())
-        .with_annotations()
-        .with_releases()
-        .with_recordings()
-        .with_release_groups()
-        .with_recording_relations()
-        .with_release_relations()
-        .with_series_relations()
+pub async fn unique_releases(artist_id: String) -> Vec<ReleaseGroup> {
+    ReleaseGroup::browse()
+        .by_artist(&artist_id)
         .execute()
         .await
         .unwrap()
+        .entities
 }
