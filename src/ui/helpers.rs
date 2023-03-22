@@ -1,5 +1,6 @@
 use crate::api::search::remote;
 use crate::ui::interface::{MainWindowState, UiState};
+use musicbrainz_rs::entity::release::Media;
 use tokio::task;
 
 use super::interface::FocusedResult;
@@ -9,18 +10,18 @@ pub(crate) async fn query_web(ui_state: &mut UiState) {
     //
     // The cloning of the data is really ugly but I found no other way because of the async tasks
     let artists = task::spawn(remote::search_artists(
-        ui_state.searchbar_content.to_owned(),
-    ));
+            ui_state.searchbar_content.to_owned(),
+            ));
     let albums = task::spawn(remote::search_albums(ui_state.searchbar_content.to_owned()));
     let titles = task::spawn(remote::search_songs(ui_state.searchbar_content.to_owned()));
 
     ui_state.searching = false;
     ui_state.searchbar_content = String::from("");
     ui_state.main_window_state = MainWindowState::Results((
-        albums.await.unwrap().unwrap(),
-        artists.await.unwrap().unwrap(),
-        titles.await.unwrap().unwrap(),
-    ));
+            albums.await.unwrap().unwrap(),
+            artists.await.unwrap().unwrap(),
+            titles.await.unwrap().unwrap(),
+            ));
 }
 
 pub(crate) fn check_scroll_space_down(ui_state: &UiState) -> bool {
@@ -33,4 +34,13 @@ pub(crate) fn check_scroll_space_down(ui_state: &UiState) -> bool {
         },
         _ => false,
     }
+}
+
+pub(crate) fn select_correct_media(media: Vec<Media>) -> Media{
+    for m in media.clone(){
+        if m.format.to_owned().unwrap() == "CD" {
+            return m.clone();
+        }
+    }
+    return media[0].clone();
 }

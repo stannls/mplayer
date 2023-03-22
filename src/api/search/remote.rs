@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::api::search::wrapper;
 use musicbrainz_rs::entity::artist::{Artist, ArtistSearchQuery};
 use musicbrainz_rs::entity::recording::{Recording, RecordingSearchQuery};
@@ -77,11 +75,32 @@ pub async fn album_from_release_group(release_group: ReleaseGroup) -> release::R
         .unwrap()
 }
 
-pub async fn unique_releases(artist_id: String) -> Vec<ReleaseGroup> {
-    ReleaseGroup::browse()
-        .by_artist(&artist_id)
+pub async fn album_from_release_group_id(release_group_id: String) -> release::Release{
+    Release::browse()
+        .by_release_group(&release_group_id)
+        .with_annotations()
+        .with_recording_level_relations()
+        .with_recordings()
         .execute()
         .await
         .unwrap()
         .entities
+        .get(0)
+        .unwrap()
+        .clone()
+}
+
+pub fn recording_by_release(release: Release, id: usize) -> Recording {
+    release.media.unwrap().get(0).unwrap().tracks.to_owned().unwrap().get(id).unwrap().recording.to_owned()
+}
+
+pub async fn unique_releases(artist_id: String) -> Vec<ReleaseGroup> {
+    let mut release_groups = ReleaseGroup::browse()
+        .by_artist(&artist_id)
+        .execute()
+        .await
+        .unwrap()
+        .entities;
+    release_groups.sort_by(|a, b| b.first_release_date.unwrap().cmp(&a.first_release_date.unwrap()));
+    release_groups
 }
