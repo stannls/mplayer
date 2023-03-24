@@ -1,7 +1,7 @@
 use super::input::Event;
 use crate::api::download::download_pool::DownloadPool;
 use crate::api::download::musify_downloader::MusifyDownloader;
-use crate::api::search::remote::{album_from_release_group, unique_releases, album_from_release_group_id, recording_by_release};
+use crate::api::search::remote::{album_from_release_group, unique_releases, album_from_release_group_id, recording_by_release, recordings_by_release};
 use crate::api::search::wrapper::{self, Artist, Recording, Release};
 use crate::ui::{components, helpers, layout};
 use crossterm::event::{DisableMouseCapture, KeyCode, KeyEvent};
@@ -207,7 +207,8 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downloader: &Down
     } else {
         match input.code {
             KeyCode::Char('d') => match ui_state.main_window_state.to_owned() {
-                MainWindowState::SongFocus(s) => println!("{:?}", downloader.download_song(s.data)),
+                MainWindowState::SongFocus(s) => downloader.download_song(s.data),
+                MainWindowState::RecordFocus(r, _) => downloader.download_songs(recordings_by_release(r)),
                 _ => {}
             }
             KeyCode::Char('q') => ui_state.quit = true,

@@ -99,6 +99,13 @@ pub fn recording_by_release(release: Release, id: usize) -> Recording {
     release.media.unwrap().get(0).unwrap().tracks.to_owned().unwrap().get(id).unwrap().recording.to_owned()
 }
 
+pub fn recordings_by_release(release: Release) -> Vec<Recording> {
+    release.media.unwrap().get(0).unwrap().tracks.to_owned().unwrap()
+        .into_iter()
+        .map(|f| f.recording)
+        .collect()
+}
+
 pub async fn unique_releases(artist_id: String) -> Vec<ReleaseGroup> {
     let mut release_groups = ReleaseGroup::browse()
         .by_artist(&artist_id)

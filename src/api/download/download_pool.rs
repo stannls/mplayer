@@ -44,4 +44,9 @@ impl DownloadPool {
             fs.move_file(filepath).unwrap();
         });
     }
+    pub fn download_songs(&self, recordings: Vec<Recording>) {
+        for r in recordings {
+            self.download_song(r);
+        }
+    }
 }
