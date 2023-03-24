@@ -1,3 +1,4 @@
+#![feature(async_closure)]
 mod api;
 mod ui;
 use std::io;

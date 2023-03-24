@@ -1,4 +1,6 @@
 use super::input::Event;
+use crate::api::download::download_pool::DownloadPool;
+use crate::api::download::musify_downloader::MusifyDownloader;
 use crate::api::search::remote::{album_from_release_group, unique_releases, album_from_release_group_id, recording_by_release};
 use crate::api::search::wrapper::{self, Artist, Recording, Release};
 use crate::ui::{components, helpers, layout};
@@ -71,6 +73,7 @@ pub fn restore_terminal(
         LeaveAlternateScreen,
         DisableMouseCapture
         )?;
+    terminal.clear()?;
     terminal.show_cursor()?;
     Ok(())
 }
@@ -80,6 +83,8 @@ pub async fn render_interface(
     rx: Receiver<Event<KeyEvent>>,
     ) {
     let mut ui_state = UiState::new();
+    let downloader = DownloadPool::new(4)
+        .add_downloader(MusifyDownloader::new());
     while !ui_state.quit {
         terminal
             .draw(|f| {
@@ -171,20 +176,19 @@ pub async fn render_interface(
                                 result_layout[3],
                                 );
                     }
-                    _ => {}
                 }
             })
         .unwrap();
 
         // Handles keyboard input
         match rx.recv().unwrap() {
-            Event::Input(event) => handle_input(event, &mut ui_state).await,
+            Event::Input(event) => handle_input(event, &mut ui_state, &downloader).await,
             _ => {}
         }
     }
 }
 
-async fn handle_input(input: KeyEvent, ui_state: &mut UiState) {
+async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downloader: &DownloadPool) {
     // Match arm for inputting text
     if ui_state.searching {
         match input.code {
@@ -202,6 +206,10 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState) {
         // Match arm for everything else
     } else {
         match input.code {
+            KeyCode::Char('d') => match ui_state.main_window_state.to_owned() {
+                MainWindowState::SongFocus(s) => println!("{:?}", downloader.download_song(s.data)),
+                _ => {}
+            }
             KeyCode::Char('q') => ui_state.quit = true,
             KeyCode::Char('s') => ui_state.searching = true,
             KeyCode::Char('A')
@@ -300,8 +308,12 @@ async fn handle_input(input: KeyEvent, ui_state: &mut UiState) {
                     }
                     _ => {}
                 },
-                MainWindowState::ArtistFocus(_, r, index) => if index.is_some() {ui_state.main_window_state = MainWindowState::RecordFocus(album_from_release_group_id(r[index.unwrap()].id.to_owned()).await, None)}
-                MainWindowState::RecordFocus(r, index) => if index.is_some() {ui_state.main_window_state = MainWindowState::SongFocus(wrapper::Recording::new(recording_by_release(r.to_owned(), index.unwrap())))}
+                MainWindowState::ArtistFocus(_, r, index) => if index.is_some() {ui_state.main_window_state = {
+                    MainWindowState::RecordFocus(album_from_release_group_id(r[index.unwrap()].id.to_owned()).await, None)};
+                },
+                MainWindowState::RecordFocus(r, index) => if index.is_some() {
+                    ui_state.main_window_state = MainWindowState::SongFocus(wrapper::Recording::new(recording_by_release(r.to_owned(), index.unwrap())));
+                }
 
                 _ => {}
             },

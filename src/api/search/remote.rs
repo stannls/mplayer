@@ -1,7 +1,7 @@
 use crate::api::search::wrapper;
 use musicbrainz_rs::entity::artist::{Artist, ArtistSearchQuery};
 use musicbrainz_rs::entity::recording::{Recording, RecordingSearchQuery};
-use musicbrainz_rs::entity::release::{self, Release, ReleasePackaging};
+use musicbrainz_rs::entity::release::{self, Release};
 use musicbrainz_rs::entity::release_group::{ReleaseGroup, ReleaseGroupSearchQuery};
 use musicbrainz_rs::prelude::*;
 use reqwest::Error;
@@ -14,6 +14,7 @@ pub async fn search_artists(query: String) -> Result<Vec<wrapper::Artist>, Error
         .with_release_relations()
         .with_releases_and_discids()
         .with_release_groups()
+        .with_artist_relations()
         .with_recordings()
         .with_recording_relations()
         .execute()
@@ -30,6 +31,8 @@ pub async fn search_songs(query: String) -> Result<Vec<wrapper::Recording>, Erro
         .recording(&query)
         .build();
     let res = Recording::search(q)
+        .with_isrcs()
+        .with_artists()
         .execute()
         .await?
         .entities
@@ -70,6 +73,7 @@ pub async fn album_from_release_group(release_group: ReleaseGroup) -> release::R
         .with_annotations()
         .with_recording_level_relations()
         .with_recordings()
+        .with_artist_credits()
         .execute()
         .await
         .unwrap()
@@ -81,6 +85,7 @@ pub async fn album_from_release_group_id(release_group_id: String) -> release::R
         .with_annotations()
         .with_recording_level_relations()
         .with_recordings()
+        .with_artist_credits()
         .execute()
         .await
         .unwrap()

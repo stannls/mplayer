@@ -1,0 +1,44 @@
+use super::AudioDownloader;
+use musicbrainz_rs::entity::recording::Recording;
+use std::sync::Arc;
+use threadpool::ThreadPool;
+use tokio::runtime::Runtime;
+
+pub struct DownloadPool {
+    downloaders: Vec<Arc<dyn AudioDownloader + Sync + Send>>,
+    threadpool: ThreadPool,
+}
+
+impl DownloadPool {
+    pub fn new(thread_count: usize) -> DownloadPool {
+        DownloadPool {
+            downloaders: vec![],
+            threadpool: ThreadPool::new(thread_count),
+        }
+    }
+    pub fn add_downloader(
+        mut self,
+        downloader: Arc<dyn AudioDownloader + Send + Sync>,
+    ) -> DownloadPool {
+        self.downloaders.push(downloader);
+        self
+    }
+    pub fn download_song(&self, recording: Recording) {
+        let downloaders = self.downloaders.clone();
+        self.threadpool.execute(move || {
+            println!("Starting download");
+            let try_all_downloaders = async || {
+                for downloader in downloaders {
+                    match downloader.download_song(recording.to_owned()).await {
+                        Ok(filename) => return Ok(filename),
+                        _ => {}
+                    }
+                }
+                return Err("No working provider");
+            };
+            let rt = Runtime::new().unwrap();
+            let filepath = rt.block_on(try_all_downloaders()).unwrap();
+            println!("{}", filepath);
+        });
+    }
+}
