@@ -1,3 +1,4 @@
+use super::file_sorter::FileSorter;
 use super::AudioDownloader;
 use musicbrainz_rs::entity::recording::Recording;
 use std::sync::Arc;
@@ -7,6 +8,7 @@ use tokio::runtime::Runtime;
 pub struct DownloadPool {
     downloaders: Vec<Arc<dyn AudioDownloader + Sync + Send>>,
     threadpool: ThreadPool,
+    file_sorter: FileSorter,
 }
 
 impl DownloadPool {
@@ -14,6 +16,7 @@ impl DownloadPool {
         DownloadPool {
             downloaders: vec![],
             threadpool: ThreadPool::new(thread_count),
+            file_sorter: FileSorter::new(),
         }
     }
     pub fn add_downloader(
@@ -25,8 +28,8 @@ impl DownloadPool {
     }
     pub fn download_song(&self, recording: Recording) {
         let downloaders = self.downloaders.clone();
+        let fs = Arc::new(self.file_sorter.clone());
         self.threadpool.execute(move || {
-            println!("Starting download");
             let try_all_downloaders = async || {
                 for downloader in downloaders {
                     match downloader.download_song(recording.to_owned()).await {
@@ -38,7 +41,7 @@ impl DownloadPool {
             };
             let rt = Runtime::new().unwrap();
             let filepath = rt.block_on(try_all_downloaders()).unwrap();
-            println!("{}", filepath);
+            fs.move_file(filepath).unwrap();
         });
     }
 }
