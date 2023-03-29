@@ -44,20 +44,9 @@ pub fn create_input_channel() -> Receiver<Event<KeyEvent>> {
 pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downloader: &DownloadPool) {
     // Match arm for inputting text
     if ui_state.searching {
-        match input.code {
-            KeyCode::Char(c) => ui_state.searchbar_content.push(c),
-            KeyCode::Backspace => {
-                ui_state.searchbar_content.pop();
-            }
-            KeyCode::Esc => {
-                ui_state.searching = false;
-                ui_state.searchbar_content.clear();
-            }
-            KeyCode::Enter => helpers::query_web(ui_state).await,
-            _ => {}
-        }
-        // Match arm for everything else
+        handle_search_input(input, ui_state).await
     } else {
+        // Match arm for everything else
         match input.code {
             KeyCode::Char('d') => match ui_state.main_window_state.to_owned() {
                 MainWindowState::SongFocus(s) => downloader.download_song(s.data),
@@ -90,41 +79,67 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                     {
                         ui_state.focused_result = FocusedResult::Playlist(0)
                     }
-            KeyCode::Down => match ui_state.focused_result {
-                FocusedResult::Song(t) => {
-                    if helpers::check_scroll_space_down(ui_state) {
-                        ui_state.focused_result = FocusedResult::Song(t + 1)
+            KeyCode::Down => match ui_state.main_window_state.clone(){
+                MainWindowState::Results(_) => match ui_state.focused_result {
+                    FocusedResult::Song(t) => {
+                        if helpers::check_scroll_space_down(ui_state) {
+                            ui_state.focused_result = FocusedResult::Song(t + 1)
+                        }
                     }
-                }
-                FocusedResult::Record(t) => {
-                    if helpers::check_scroll_space_down(ui_state) {
-                        ui_state.focused_result = FocusedResult::Record(t + 1)
+                    FocusedResult::Record(t) => {
+                        if helpers::check_scroll_space_down(ui_state) {
+                            ui_state.focused_result = FocusedResult::Record(t + 1)
+                        }
                     }
-                }
-                FocusedResult::Artist(t) => {
-                    if helpers::check_scroll_space_down(ui_state) {
-                        ui_state.focused_result = FocusedResult::Artist(t + 1)
+                    FocusedResult::Artist(t) => {
+                        if helpers::check_scroll_space_down(ui_state) {
+                            ui_state.focused_result = FocusedResult::Artist(t + 1)
+                        }
+                    },
+                    _ => {}
+
+                },
+                MainWindowState::ArtistFocus(a, r, index) => {
+                    if index.is_none() {
+                        ui_state.main_window_state = MainWindowState::ArtistFocus(a, r, Some(0));
+                    } else if r.len() - index.unwrap() > 1 {
+                        ui_state.main_window_state = MainWindowState::ArtistFocus(a, r, Some(index.unwrap()+1));
                     }
-                }
+                },
+                MainWindowState::RecordFocus(r, index) => {
+                    if index.is_none() {
+                        ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(0));
+                    } else if r.media.clone().unwrap().get(0).unwrap().tracks.to_owned().unwrap().len() - index.unwrap() > 1 {
+                        ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(index.unwrap()+1));
+                    }
+
+                },
                 _ => {}
+
             },
-            KeyCode::Up => match ui_state.focused_result {
-                FocusedResult::Song(t) => {
-                    if t > 0 {
-                        ui_state.focused_result = FocusedResult::Song(t - 1)
+            KeyCode::Up => match ui_state.main_window_state.clone(){
+                MainWindowState::Results(_) => match ui_state.focused_result {
+                    FocusedResult::Song(t) => {
+                        if t > 0 {
+                            ui_state.focused_result = FocusedResult::Song(t - 1)
+                        }
                     }
-                }
-                FocusedResult::Record(t) => {
-                    if t > 0 {
-                        ui_state.focused_result = FocusedResult::Record(t - 1)
+                    FocusedResult::Record(t) => {
+                        if t > 0 {
+                            ui_state.focused_result = FocusedResult::Record(t - 1)
+                        }
                     }
-                }
-                FocusedResult::Artist(t) => {
-                    if t > 0 {
-                        ui_state.focused_result = FocusedResult::Artist(t - 1)
+                    FocusedResult::Artist(t) => {
+                        if t > 0 {
+                            ui_state.focused_result = FocusedResult::Artist(t - 1)
+                        }
                     }
-                }
+                    _ => {}
+                },
+                MainWindowState::ArtistFocus(a, r, index) => if index.is_some() && index.unwrap() > 0 {ui_state.main_window_state = MainWindowState::ArtistFocus(a, r, Some(index.unwrap()-1))},
+                MainWindowState::RecordFocus(r, index) => if index.is_some() && index.unwrap() > 0 {ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(index.unwrap()-1))},
                 _ => {}
+
             },
             KeyCode::Char('b') => match ui_state.main_window_state {
                 MainWindowState::SongFocus(_)
@@ -173,34 +188,21 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
             },
             _ => {}
         }
-        match ui_state.main_window_state.clone() {
-            MainWindowState::ArtistFocus(a, r, index) => {
-                match input.code {
-                    KeyCode::Down => {
-                        if index.is_none() {
-                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, r, Some(0));
-                        } else if r.len() - index.unwrap() > 1 {
-                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, r, Some(index.unwrap()+1));
-                        }
-                    },
-                    KeyCode::Up => if index.is_some() && index.unwrap() > 0 {ui_state.main_window_state = MainWindowState::ArtistFocus(a, r, Some(index.unwrap()-1))},
-                    _ => {}
-                }
-            },
-            MainWindowState::RecordFocus(r, index) => {
-                match input.code {
-                    KeyCode::Down => {
-                        if index.is_none() {
-                            ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(0));
-                        } else if r.media.clone().unwrap().get(0).unwrap().tracks.to_owned().unwrap().len() - index.unwrap() > 1 {
-                            ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(index.unwrap()+1));
-                        }
-                    },
-                    KeyCode::Up => if index.is_some() && index.unwrap() > 0 {ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(index.unwrap()-1))},
-                    _ => {}
-                }
-            },
-            _ => {}
-        }
     }
+}
+
+async fn handle_search_input(input: KeyEvent, ui_state: &mut UiState) {
+    match input.code {
+        KeyCode::Char(c) => ui_state.searchbar_content.push(c),
+        KeyCode::Backspace => {
+            ui_state.searchbar_content.pop();
+        }
+        KeyCode::Esc => {
+            ui_state.searching = false;
+            ui_state.searchbar_content.clear();
+        }
+        KeyCode::Enter => helpers::query_web(ui_state).await,
+        _ => {}
+    }
+
 }
