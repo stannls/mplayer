@@ -92,6 +92,7 @@ pub async fn render_interface(
 
                 let main_layout = layout::build_main_layout().split(size);
                 let content_layout = layout::build_content_layout().split(main_layout[1]);
+                let focus_layout = layout::build_focus_layout().split(content_layout[1]);
 
                 f.render_widget(components::build_window_border(), size);
                 f.render_widget(
@@ -105,13 +106,16 @@ pub async fn render_interface(
                         f.render_widget(components::build_main_window(), content_layout[1])
                     }
                     MainWindowState::SongFocus(s) => {
-                        f.render_widget(components::build_song_focus(s), content_layout[1])
+                        f.render_widget(components::build_song_focus(s), content_layout[1]);
+                        f.render_widget(components::build_focus_toolbox(true), focus_layout[1]);
                     }
                     MainWindowState::RecordFocus(r, index) => {
-                        f.render_widget(components::build_record_focus(r, index), content_layout[1])
+                        f.render_widget(components::build_record_focus(r, index), content_layout[1]);
+                        f.render_widget(components::build_focus_toolbox(true), focus_layout[1]);
                     }
                     MainWindowState::ArtistFocus(a, r, index) => {
-                        f.render_widget(components::build_artist_focus(a, r, index), content_layout[1])
+                        f.render_widget(components::build_artist_focus(a, r, index), content_layout[1]);
+                        f.render_widget(components::build_focus_toolbox(false), focus_layout[1]);
                     }
                     MainWindowState::Results(t) => {
                         let scroll_value = match ui_state.focused_result {

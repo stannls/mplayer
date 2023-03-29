@@ -30,6 +30,14 @@ pub fn build_searchbar(searching: &bool, searchbar_content: &String) -> Paragrap
     .block(Block::default().borders(Borders::all()).title("Search"))
 }
 
+pub fn build_focus_toolbox(download: bool) -> Paragraph<'static> {
+    Paragraph::new(if download {
+        String::from("[b]ack [d]ownload [↑]up [↓]down [enter]select")
+    } else {
+        String::from("[b]ack [↑]up [↓]down [enter]select")
+    })
+}
+
 pub fn build_result_box<T: wrapper::SearchEntity>(
     title: String,
     content: Vec<T>,

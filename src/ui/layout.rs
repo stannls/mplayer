@@ -36,3 +36,10 @@ pub fn build_search_layout(parent_layout: Rect) -> Vec<Rect> {
         )
         .collect()
 }
+
+pub fn build_focus_layout() -> Layout {
+    Layout::default()
+        .direction(Direction::Vertical)
+        .margin(0)
+        .constraints([Constraint::Percentage(99), Constraint::Percentage(1)].as_ref())
+}
