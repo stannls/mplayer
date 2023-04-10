@@ -55,30 +55,34 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
             }
             KeyCode::Char('q') => ui_state.quit = true,
             KeyCode::Char('s') => ui_state.searching = true,
-            KeyCode::Char('A')
+            KeyCode::Char('A') => {
                 if matches!(ui_state.main_window_state, MainWindowState::Results(_))
-                    && !matches!(ui_state.focused_result, FocusedResult::Artist(_)) =>
+                    && !matches!(ui_state.focused_result, FocusedResult::Artist(_))
                     {
                         ui_state.focused_result = FocusedResult::Artist(0)
                     }
-            KeyCode::Char('S')
+            }
+            KeyCode::Char('S') => {
                 if matches!(ui_state.main_window_state, MainWindowState::Results(_))
-                    && !matches!(ui_state.focused_result, FocusedResult::Song(_)) =>
+                    && !matches!(ui_state.focused_result, FocusedResult::Song(_))
                     {
                         ui_state.focused_result = FocusedResult::Song(0)
                     }
-            KeyCode::Char('R')
+            }
+            KeyCode::Char('R') => {
                 if matches!(ui_state.main_window_state, MainWindowState::Results(_))
-                    && !matches!(ui_state.focused_result, FocusedResult::Record(_)) =>
+                    && !matches!(ui_state.focused_result, FocusedResult::Record(_))
                     {
                         ui_state.focused_result = FocusedResult::Record(0)
                     }
-            KeyCode::Char('P')
+            }
+            KeyCode::Char('P') => {
                 if matches!(ui_state.main_window_state, MainWindowState::Results(_))
-                    && !matches!(ui_state.focused_result, FocusedResult::Playlist(_)) =>
+                    && !matches!(ui_state.focused_result, FocusedResult::Playlist(_))
                     {
                         ui_state.focused_result = FocusedResult::Playlist(0)
                     }
+            }
             KeyCode::Down => match ui_state.main_window_state.clone(){
                 MainWindowState::Results(_) => match ui_state.focused_result {
                     FocusedResult::Song(t) => {

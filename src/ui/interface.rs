@@ -2,8 +2,8 @@ use super::input::Event;
 use super::input::handle_input;
 use crate::api::download::download_pool::DownloadPool;
 use crate::api::download::musify_downloader::MusifyDownloader;
-use crate::ui::{components, helpers, layout};
-use crossterm::event::{DisableMouseCapture, KeyCode, KeyEvent};
+use crate::ui::{components, layout};
+use crossterm::event::{DisableMouseCapture, KeyEvent};
 use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen};
 use musicbrainz_rs::entity::{artist, release};
@@ -79,107 +79,74 @@ pub fn restore_terminal(
     Ok(())
 }
 
-pub async fn render_interface(
-    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    rx: Receiver<Event<KeyEvent>>,
-    ) {
+pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,rx: Receiver<Event<KeyEvent>>) {
+    // Init for ui state and the downloader
     let mut ui_state = UiState::new();
     let downloader = DownloadPool::new(4)
         .add_downloader(MusifyDownloader::new());
+
+    // Main UI render loop
     while !ui_state.quit {
         terminal
             .draw(|f| {
-                let size = f.size();
 
+                // Layouting
+                let size = f.size();
                 let main_layout = layout::build_main_layout().split(size);
                 let content_layout = layout::build_content_layout().split(main_layout[1]);
                 let focus_layout = layout::build_focus_layout().split(content_layout[1]);
+                let result_layout = layout::build_search_layout(content_layout[1]);
 
+                // Main window border
                 f.render_widget(components::build_window_border(), size);
-                f.render_widget(
-                    components::build_searchbar(&ui_state.searching, &ui_state.searchbar_content),
-                    main_layout[0],
-                    );
+
+                // Searchbar
+                let search = if ui_state.searching {Some(ui_state.searchbar_content.to_owned())} else {None};
+                f.render_widget(components::build_searchbar(search), main_layout[0]);
+
+                // Side menu
                 f.render_widget(components::build_side_menu(), content_layout[0]);
 
-                match ui_state.clone().main_window_state {
+                // The main content window
+                match ui_state.main_window_state.to_owned() {
+                    // The default welcome screen
                     MainWindowState::Welcome => {
-                        f.render_widget(components::build_main_window(), content_layout[1])
+                        f.render_widget(components::build_welcome_window(), content_layout[1])
                     }
+                    // The window for viewing details to a song
                     MainWindowState::SongFocus(s) => {
                         f.render_widget(components::build_song_focus(s), content_layout[1]);
                         f.render_widget(components::build_focus_toolbox(true), focus_layout[1]);
                     }
+                    // The window for viewing details to a record
                     MainWindowState::RecordFocus(r, index) => {
-                        f.render_widget(components::build_record_focus(r, index), content_layout[1]);
+                        f.render_widget(components::build_record_focus(r, index, content_layout[1].height as usize - 3), content_layout[1]);
                         f.render_widget(components::build_focus_toolbox(true), focus_layout[1]);
                     }
+                    // The window for viewing details to an artist
                     MainWindowState::ArtistFocus(a, r, index) => {
-                        f.render_widget(components::build_artist_focus(a, r, index), content_layout[1]);
+                        f.render_widget(components::build_artist_focus(a, r, index, content_layout[1].height as usize - 3), content_layout[1]);
                         f.render_widget(components::build_focus_toolbox(false), focus_layout[1]);
                     }
                     MainWindowState::Results(t) => {
+                        // Determines which of the search results is focused
                         let scroll_value = match ui_state.focused_result {
-                            FocusedResult::Song(t)
-                                | FocusedResult::Record(t)
-                                | FocusedResult::Artist(t)
-                                | FocusedResult::Playlist(t) => Some(t),
-                            _ => None,
+                            FocusedResult::Song(t) => (Some(t), None, None, None),
+                            FocusedResult::Record(t) => (None, Some(t), None, None),
+                            FocusedResult::Artist(t) => (None, None, Some(t), None),
+                            FocusedResult::Playlist(t) => (None, None, None, Some(t)),
+                            _ => (None, None, None, None),
                         };
-                        let result_layout = layout::build_search_layout(content_layout[1]);
+                        // Calculates how many results can be rendered on the current screen
                         let displayable_results = result_layout[0].height as usize - 3;
-                        f.render_widget(
-                            components::build_result_box(
-                                String::from("[S]ong"),
-                                t.2,
-                                if matches!(ui_state.focused_result, FocusedResult::Song(_)) {
-                                    scroll_value
-                                } else {
-                                    None
-                                },
-                                displayable_results,
-                                ),
-                                result_layout[0],
-                                );
-                        f.render_widget(
-                            components::build_result_box(
-                                String::from("[A]rtist"),
-                                t.1,
-                                if matches!(ui_state.focused_result, FocusedResult::Artist(_)) {
-                                    scroll_value
-                                } else {
-                                    None
-                                },
-                                displayable_results,
-                                ),
-                                result_layout[1],
-                                );
-                        f.render_widget(
-                            components::build_result_box(
-                                String::from("[R]ecord"),
-                                t.0,
-                                if matches!(ui_state.focused_result, FocusedResult::Record(_)) {
-                                    scroll_value
-                                } else {
-                                    None
-                                },
-                                displayable_results,
-                                ),
-                                result_layout[2],
-                                );
-                        f.render_widget(
-                            components::build_result_box::<wrapper::Artist>(
-                                String::from("[P]laylist"),
-                                vec![],
-                                if matches!(ui_state.focused_result, FocusedResult::Playlist(_)) {
-                                    scroll_value
-                                } else {
-                                    None
-                                },
-                                displayable_results,
-                                ),
-                                result_layout[3],
-                                );
+                        // Song search results
+                        f.render_widget(components::build_result_box("[S]ong".to_string(), t.2, scroll_value.0, displayable_results), result_layout[0]);
+                        // Record search results
+                        f.render_widget(components::build_result_box("[R]ecord".to_string(), t.0, scroll_value.1, displayable_results), result_layout[2]);
+                        // Artist search results
+                        f.render_widget(components::build_result_box("[A]rtist".to_string(), t.1, scroll_value.2, displayable_results), result_layout[1]);
+                        // Playlsist search results (Not implemented)
+                        f.render_widget(components::build_result_box::<wrapper::Artist>("[P]laylist".to_string(), vec![], scroll_value.3, displayable_results),result_layout[3]);
                     }
                 }
             })
