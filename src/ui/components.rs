@@ -1,8 +1,7 @@
 use super::scroll_components::ScrollTable;
-use crate::api::search::wrapper;
-use crate::ui::helpers::select_correct_media;
-use chrono::Duration;
-use musicbrainz_rs::entity::{artist, release, release_group::ReleaseGroup};
+use crate::api::{search::wrapper, Album, Song};
+
+use musicbrainz_rs::entity::{artist, release_group::ReleaseGroup};
 use tui::{
     layout::Constraint,
     widgets::{Block, Borders, Paragraph, Row, Table},
@@ -14,8 +13,18 @@ pub fn build_window_border() -> Block<'static> {
 }
 
 // The menu on the left side
-pub fn build_side_menu() -> Paragraph<'static> {
-    Paragraph::new("Albums").block(Block::default().borders(Borders::ALL).title("Libary"))
+pub fn build_side_menu(
+    content: Vec<String>,
+    index: Option<usize>,
+    displayable_results: usize,
+) -> Table<'static> {
+    let rows = content.into_iter().map(|f| vec![f]).collect();
+    ScrollTable::new(rows)
+        .focus(index)
+        .displayable_results(displayable_results)
+        .render()
+        .block(Block::default().borders(Borders::all()).title("[L]ibary"))
+        .widths(&[Constraint::Percentage(100)])
 }
 
 // The welcome window
@@ -28,9 +37,9 @@ pub fn build_welcome_window() -> Paragraph<'static> {
 pub fn build_searchbar(searchbar_content: Option<String>) -> Paragraph<'static> {
     let content = match searchbar_content {
         Some(t) => t,
-        _ => "Enter search term [s]".to_string(),
+        _ => "Enter search term".to_string(),
     };
-    Paragraph::new(content).block(Block::default().borders(Borders::all()).title("Search"))
+    Paragraph::new(content).block(Block::default().borders(Borders::all()).title("[S]earch"))
 }
 
 // The Toolbar that is show when selecting a search result
@@ -81,12 +90,11 @@ pub fn build_artist_focus(
         .widths(&[Constraint::Percentage(80), Constraint::Percentage(20)])
 }
 
-pub fn build_song_focus(song: wrapper::Recording) -> Table<'static> {
-    let t = Duration::milliseconds(song.data.length.unwrap() as i64);
+pub fn build_song_focus(song: Box<dyn Song>) -> Table<'static> {
     let title = format!(
         "{}{}",
-        song.data.title.clone(),
-        match song.data.disambiguation {
+        song.get_title(),
+        match song.get_disambiguation() {
             Some(str) =>
                 if str != "" {
                     format!(" ({})", str)
@@ -96,16 +104,12 @@ pub fn build_song_focus(song: wrapper::Recording) -> Table<'static> {
             _ => format!(""),
         }
     );
-    let content = Row::new(vec![
-        String::from("1"),
-        title,
-        format!("{}:{}", (t.num_seconds() / 60) % 60, t.num_seconds() % 60),
-    ]);
+    let content = Row::new(vec![String::from("1"), title, song.get_length()]);
     return Table::new(vec![content])
         .block(
             Block::default()
                 .borders(Borders::all())
-                .title(song.data.title),
+                .title(song.get_title()),
         )
         .header(Row::new(vec!["#", "Title", "Length"]))
         .widths(&[
@@ -116,21 +120,18 @@ pub fn build_song_focus(song: wrapper::Recording) -> Table<'static> {
 }
 
 pub fn build_record_focus(
-    record: release::Release,
+    record: Box<dyn Album>,
     index: Option<usize>,
     displayable_results: usize,
 ) -> Table<'static> {
-    let rows: Vec<Vec<String>> = select_correct_media(record.media.to_owned().unwrap())
-        .tracks
-        .to_owned()
-        .unwrap()
+    let rows: Vec<Vec<String>> = record
+        .get_songs()
         .into_iter()
         .map(|f| {
-            let t = Duration::milliseconds(f.length.unwrap() as i64);
             vec![
-                f.number,
-                f.title,
-                format!("{}:{}", (t.num_seconds() / 60) % 60, t.num_seconds() % 60),
+                f.get_number().unwrap_or("".to_string()),
+                f.get_title(),
+                f.get_length(),
             ]
         })
         .collect();
@@ -140,7 +141,11 @@ pub fn build_record_focus(
         .displayable_results(displayable_results)
         .render()
         .header(Row::new(vec!["#", "Title", "Length"]))
-        .block(Block::default().borders(Borders::all()).title(record.title))
+        .block(
+            Block::default()
+                .borders(Borders::all())
+                .title(record.get_name()),
+        )
         .widths(&[
             Constraint::Percentage(2),
             Constraint::Percentage(90),

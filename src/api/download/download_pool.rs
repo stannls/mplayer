@@ -1,6 +1,8 @@
+use crate::api::Song;
+
 use super::file_sorter::FileSorter;
 use super::AudioDownloader;
-use musicbrainz_rs::entity::recording::Recording;
+
 use std::sync::Arc;
 use threadpool::ThreadPool;
 use tokio::runtime::Runtime;
@@ -26,7 +28,7 @@ impl DownloadPool {
         self.downloaders.push(downloader);
         self
     }
-    pub fn download_song(&self, recording: Recording) {
+    pub fn download_song(&self, recording: Box<dyn Song>) {
         let downloaders = self.downloaders.clone();
         let fs = Arc::new(self.file_sorter.clone());
         self.threadpool.execute(move || {
@@ -44,7 +46,7 @@ impl DownloadPool {
             fs.move_file(filepath).unwrap();
         });
     }
-    pub fn download_songs(&self, recordings: Vec<Recording>) {
+    pub fn download_songs(&self, recordings: Vec<Box<dyn Song>>) {
         for r in recordings {
             self.download_song(r);
         }

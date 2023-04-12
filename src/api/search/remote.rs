@@ -6,7 +6,7 @@ use musicbrainz_rs::entity::release_group::{ReleaseGroup, ReleaseGroupSearchQuer
 use musicbrainz_rs::prelude::*;
 use reqwest::Error;
 
-pub async fn search_artists(query: String) -> Result<Vec<wrapper::Artist>, Error> {
+pub async fn search_artists(query: String) -> Result<Vec<wrapper::ArtistWrapper>, Error> {
     let q = ArtistSearchQuery::query_builder().artist(&query).build();
 
     let res = Artist::search(q)
@@ -21,12 +21,12 @@ pub async fn search_artists(query: String) -> Result<Vec<wrapper::Artist>, Error
         .await?
         .entities
         .into_iter()
-        .map(|f| wrapper::Artist::new(f))
+        .map(|f| wrapper::ArtistWrapper::new(f))
         .collect();
     Ok(res)
 }
 
-pub async fn search_songs(query: String) -> Result<Vec<wrapper::Recording>, Error> {
+pub async fn search_songs(query: String) -> Result<Vec<wrapper::SongWrapper>, Error> {
     let q = RecordingSearchQuery::query_builder()
         .recording(&query)
         .build();
@@ -37,12 +37,12 @@ pub async fn search_songs(query: String) -> Result<Vec<wrapper::Recording>, Erro
         .await?
         .entities
         .into_iter()
-        .map(|f| wrapper::Recording::new(f))
+        .map(|f| wrapper::SongWrapper::new(f))
         .collect();
     Ok(res)
 }
 
-pub async fn search_albums(query: String) -> Result<Vec<wrapper::Release>, Error> {
+pub async fn search_albums(query: String) -> Result<Vec<wrapper::ReleaseGroupWrapper>, Error> {
     let q = ReleaseGroupSearchQuery::query_builder()
         .release(&query)
         .build();
@@ -55,7 +55,7 @@ pub async fn search_albums(query: String) -> Result<Vec<wrapper::Release>, Error
         .await?
         .entities
         .into_iter()
-        .map(|f| wrapper::Release::new(f))
+        .map(|f| wrapper::ReleaseGroupWrapper::new(f))
         .collect();
     Ok(res)
 }

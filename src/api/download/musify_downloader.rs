@@ -1,3 +1,4 @@
+use crate::api::Song;
 use crate::api::download::AudioDownloader;
 use std::sync::Arc;
 use std::fs::File;
@@ -5,7 +6,7 @@ use serde::Deserialize;
 use std::io::Cursor;
 use regex::Regex;
 use async_trait::async_trait;
-use musicbrainz_rs::entity::recording::Recording;
+
 
 #[derive(Deserialize, Debug)]
 #[allow(dead_code)]
@@ -58,8 +59,8 @@ impl MusifyDownloader {
 
 #[async_trait]
 impl AudioDownloader for MusifyDownloader {
-    async fn download_song(&self, recording: Recording) ->  Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let query = format!("{} - {}", recording.artist_credit.unwrap().get(0).unwrap().name, recording.title);
+    async fn download_song(&self, recording: Box<dyn Song>) ->  Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        let query = format!("{} - {}", recording.get_artist_name(), recording.get_title());
         let page_link = MusifyDownloader::get_page_link(query).await?;
         let (download_link, filename) = MusifyDownloader::parse_page_link(page_link)?;
         Ok(MusifyDownloader::download_from_link(download_link, filename).await?)

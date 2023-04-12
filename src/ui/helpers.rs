@@ -36,11 +36,3 @@ pub(crate) fn check_scroll_space_down(ui_state: &UiState) -> bool {
     }
 }
 
-pub(crate) fn select_correct_media(media: Vec<Media>) -> Media{
-    for m in media.clone(){
-        if m.format.to_owned().unwrap() == "CD" {
-            return m.clone();
-        }
-    }
-    return media[0].clone();
-}

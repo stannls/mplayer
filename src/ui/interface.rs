@@ -1,18 +1,20 @@
 use super::input::Event;
 use super::input::handle_input;
+use crate::api::{Song, Album};
 use crate::api::download::download_pool::DownloadPool;
 use crate::api::download::musify_downloader::MusifyDownloader;
+use crate::api::fs::scan_artists;
 use crate::ui::{components, layout};
 use crossterm::event::{DisableMouseCapture, KeyEvent};
 use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen};
-use musicbrainz_rs::entity::{artist, release};
+use musicbrainz_rs::entity::artist;
 use std::io;
 use std::{io::Stdout, sync::mpsc::Receiver};
 use tui::{backend::CrosstermBackend, Terminal};
 use musicbrainz_rs::entity::release_group::ReleaseGroup;
 
-use crate::api::search::wrapper::{self, Artist, Recording, Release};
+use crate::api::search::wrapper::{self, ArtistWrapper, SongWrapper, ReleaseGroupWrapper};
 
 #[derive(Clone)]
 pub(crate) struct UiState {
@@ -21,16 +23,17 @@ pub(crate) struct UiState {
     pub(crate) quit: bool,
     pub(crate) main_window_state: MainWindowState,
     pub(crate) focused_result: FocusedResult,
-    pub(crate) last_search: Option<(Vec<Release>, Vec<Artist>, Vec<Recording>)>,
+    pub(crate) last_search: Option<(Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)>,
+    pub(crate) artists: Vec<String>,
 }
 
 #[derive(Clone)]
 pub(crate) enum MainWindowState {
     Welcome,
-    Results((Vec<Release>, Vec<Artist>, Vec<Recording>)),
-    SongFocus(Recording),
+    Results((Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)),
+    SongFocus(Box<dyn Song>),
     ArtistFocus(artist::Artist, Vec<ReleaseGroup>, Option<usize>),
-    RecordFocus(release::Release, Option<usize>),
+    RecordFocus(Box<dyn Album>, Option<usize>),
 }
 
 #[derive(Clone)]
@@ -40,6 +43,7 @@ pub(crate) enum FocusedResult {
     Record(usize),
     Artist(usize),
     Playlist(usize),
+    Libary(usize),
 }
 
 impl UiState {
@@ -51,6 +55,7 @@ impl UiState {
             main_window_state: MainWindowState::Welcome,
             focused_result: FocusedResult::None,
             last_search: None,
+            artists: vec![],
         }
     }
 }
@@ -105,7 +110,11 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                 f.render_widget(components::build_searchbar(search), main_layout[0]);
 
                 // Side menu
-                f.render_widget(components::build_side_menu(), content_layout[0]);
+                let index = match ui_state.focused_result {
+                    FocusedResult::Libary(i) => Some(i),
+                    _ => None,
+                };
+                f.render_widget(components::build_side_menu(ui_state.artists.to_owned(), index, content_layout[0].height as usize - 3), content_layout[0]);
 
                 // The main content window
                 match ui_state.main_window_state.to_owned() {
@@ -146,7 +155,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                         // Artist search results
                         f.render_widget(components::build_result_box("[A]rtist".to_string(), t.1, scroll_value.2, displayable_results), result_layout[1]);
                         // Playlsist search results (Not implemented)
-                        f.render_widget(components::build_result_box::<wrapper::Artist>("[P]laylist".to_string(), vec![], scroll_value.3, displayable_results),result_layout[3]);
+                        f.render_widget(components::build_result_box::<wrapper::ArtistWrapper>("[P]laylist".to_string(), vec![], scroll_value.3, displayable_results),result_layout[3]);
                     }
                 }
             })
@@ -157,6 +166,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
             Event::Input(event) => handle_input(event, &mut ui_state, &downloader).await,
             _ => {}
         }
+        ui_state.artists = scan_artists();
     }
 }
 
