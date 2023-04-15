@@ -21,7 +21,7 @@ pub async fn search_artists(query: String) -> Result<Vec<wrapper::ArtistWrapper>
         .await?
         .entities
         .into_iter()
-        .map(|f| wrapper::ArtistWrapper::new(f))
+        .map(|f| wrapper::ArtistWrapper::new(f, vec![]))
         .collect();
     Ok(res)
 }
@@ -93,17 +93,6 @@ pub async fn album_from_release_group_id(release_group_id: String) -> release::R
         .get(0)
         .unwrap()
         .clone()
-}
-
-pub fn recording_by_release(release: Release, id: usize) -> Recording {
-    release.media.unwrap().get(0).unwrap().tracks.to_owned().unwrap().get(id).unwrap().recording.to_owned()
-}
-
-pub fn recordings_by_release(release: Release) -> Vec<Recording> {
-    release.media.unwrap().get(0).unwrap().tracks.to_owned().unwrap()
-        .into_iter()
-        .map(|f| f.recording)
-        .collect()
 }
 
 pub async fn unique_releases(artist_id: String) -> Vec<ReleaseGroup> {

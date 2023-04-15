@@ -112,11 +112,11 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                         _ => {}
 
                     },
-                    MainWindowState::ArtistFocus(a, r, index) => {
+                    MainWindowState::ArtistFocus(a, index) => {
                         if index.is_none() {
-                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, r, Some(0));
-                        } else if r.len() - index.unwrap() > 1 {
-                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, r, Some(index.unwrap()+1));
+                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(0));
+                        } else if a.get_albums().len() - index.unwrap() > 1 {
+                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(index.unwrap()+1));
                         }
                     },
                     MainWindowState::RecordFocus(r, index) => {
@@ -159,7 +159,7 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                         }
                         _ => {}
                     },
-                    MainWindowState::ArtistFocus(a, r, index) => if index.is_some() && index.unwrap() > 0 {ui_state.main_window_state = MainWindowState::ArtistFocus(a, r, Some(index.unwrap()-1))},
+                    MainWindowState::ArtistFocus(a, index) => if index.is_some() && index.unwrap() > 0 {ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(index.unwrap()-1))},
                     MainWindowState::RecordFocus(r, index) => if index.is_some() && index.unwrap() > 0 {ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(index.unwrap()-1))},
                     _ => {}
 
@@ -175,7 +175,7 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
             },
             KeyCode::Char('b') => match ui_state.main_window_state {
                 MainWindowState::SongFocus(_)
-                    | MainWindowState::ArtistFocus(_, _, _)
+                    | MainWindowState::ArtistFocus(_, _)
                     | MainWindowState::RecordFocus(_, _) => {
                         if matches!(ui_state.last_search, Some(_)) {
                             ui_state.main_window_state =
@@ -205,12 +205,16 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                         ui_state.focused_result = FocusedResult::None;
                         ui_state.last_search = Some(r.clone());
                         let albums = unique_releases(r.1.get(id).unwrap().clone().data.id).await;
-                        ui_state.main_window_state = MainWindowState::ArtistFocus(r.1.get(id).unwrap().clone().data.to_owned(), albums, None);
+                        ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(r.1.get(id).unwrap().releases(albums)), None);
                     }
                     _ => {}
                 },
-                MainWindowState::ArtistFocus(_, r, index) => if index.is_some() {ui_state.main_window_state = {
-                    MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(r[index.unwrap()].id.to_owned()).await)), None)};
+                MainWindowState::ArtistFocus(a, index) => if index.is_some() {ui_state.main_window_state =
+                    if a.get_albums().get(index.unwrap()).unwrap().is_groups() {
+                        MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(a.get_albums().get(index.unwrap()).unwrap().get_id()).await)), None)
+                    } else {
+                        MainWindowState::RecordFocus(a.get_albums().get(index.unwrap()).unwrap().to_owned(), None)};
+
                 },
                 MainWindowState::RecordFocus(r, index) => if index.is_some() {
                     ui_state.main_window_state = MainWindowState::SongFocus(r.get_songs().get(index.unwrap()).unwrap().to_owned());

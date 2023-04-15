@@ -1,7 +1,6 @@
 use super::scroll_components::ScrollTable;
-use crate::api::{search::wrapper, Album, Song};
+use crate::api::{search::wrapper, Album, Artist, Song};
 
-use musicbrainz_rs::entity::{artist, release_group::ReleaseGroup};
 use tui::{
     layout::Constraint,
     widgets::{Block, Borders, Paragraph, Row, Table},
@@ -68,24 +67,24 @@ pub fn build_result_box<T: wrapper::SearchEntity>(
 }
 
 pub fn build_artist_focus(
-    artist: artist::Artist,
-    release_groups: Vec<ReleaseGroup>,
+    artist: Box<dyn Artist>,
     index: Option<usize>,
     displayable_results: usize,
 ) -> Table<'static> {
     let mut rows = vec![];
-    for r in release_groups {
-        rows.push(vec![
-            r.title.to_owned(),
-            r.first_release_date.unwrap().to_string(),
-        ]);
+    for r in artist.get_albums() {
+        rows.push(vec![r.get_name(), r.get_release_date()]);
     }
 
     ScrollTable::new(rows)
         .focus(index)
         .displayable_results(displayable_results)
         .render()
-        .block(Block::default().borders(Borders::all()).title(artist.name))
+        .block(
+            Block::default()
+                .borders(Borders::all())
+                .title(artist.get_name()),
+        )
         .header(Row::new(vec!["Title", "Release Date"]))
         .widths(&[Constraint::Percentage(80), Constraint::Percentage(20)])
 }

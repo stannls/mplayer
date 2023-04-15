@@ -1,25 +1,48 @@
-use crate::api::{Album, Song};
+use crate::api::{Album, Artist, Song};
 use chrono::Duration;
 use musicbrainz_rs::entity::{
     artist, recording,
     release::{Release, Track},
-    release_group,
+    release_group::{self, ReleaseGroup},
 };
 
 #[derive(Clone)]
 pub struct ArtistWrapper {
     pub data: artist::Artist,
+    release_groups: Vec<ReleaseGroup>,
 }
 
 impl ArtistWrapper {
-    pub fn new(artist: artist::Artist) -> ArtistWrapper {
-        ArtistWrapper { data: artist }
+    pub fn new(artist: artist::Artist, release_groups: Vec<ReleaseGroup>) -> ArtistWrapper {
+        ArtistWrapper {
+            data: artist,
+            release_groups,
+        }
+    }
+    pub fn releases(&self, release_groups: Vec<ReleaseGroup>) -> ArtistWrapper {
+        ArtistWrapper {
+            data: self.data.to_owned(),
+            release_groups,
+        }
     }
 }
 
 impl SearchEntity for ArtistWrapper {
     fn display(&self) -> String {
         self.data.name.to_owned()
+    }
+}
+
+impl Artist for ArtistWrapper {
+    fn get_name(&self) -> String {
+        self.data.name.to_owned()
+    }
+    fn get_albums(&self) -> Vec<Box<dyn Album>> {
+        self.release_groups
+            .to_owned()
+            .into_iter()
+            .map(|f| Box::new(ReleaseGroupWrapper::new(f)) as Box<dyn Album>)
+            .collect()
     }
 }
 
@@ -110,6 +133,24 @@ impl SearchEntity for ReleaseGroupWrapper {
     }
 }
 
+impl Album for ReleaseGroupWrapper {
+    fn get_name(&self) -> String {
+        self.data.title.to_owned()
+    }
+    fn get_release_date(&self) -> String {
+        self.data.first_release_date.unwrap().to_string()
+    }
+    fn get_songs(&self) -> Vec<Box<dyn Song>> {
+        vec![]
+    }
+    fn is_groups(&self) -> bool {
+        true
+    }
+    fn get_id(&self) -> String {
+        self.data.id.to_owned()
+    }
+}
+
 #[derive(Clone)]
 pub struct AlbumWrapper {
     pub data: Release,
@@ -144,6 +185,12 @@ impl Album for AlbumWrapper {
             songs.push(Box::new(TrackWrapper::new(s)));
         }
         songs
+    }
+    fn is_groups(&self) -> bool {
+        false
+    }
+    fn get_id(&self) -> String {
+        self.data.id.to_owned()
     }
 }
 

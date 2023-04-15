@@ -1,8 +1,6 @@
 use crate::api::search::remote;
 use crate::ui::interface::{MainWindowState, UiState};
-use musicbrainz_rs::entity::release::Media;
 use tokio::task;
-
 use super::interface::FocusedResult;
 
 pub(crate) async fn query_web(ui_state: &mut UiState) {

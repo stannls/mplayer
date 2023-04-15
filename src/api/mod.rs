@@ -24,6 +24,8 @@ pub trait Album: DynClone {
     fn get_name(&self) -> String;
     fn get_release_date(&self) -> String;
     fn get_songs(&self) -> Vec<Box<dyn Song>>;
+    fn is_groups(&self) -> bool;
+    fn get_id(&self) -> String;
 }
 
 dyn_clone::clone_trait_object!(Album);

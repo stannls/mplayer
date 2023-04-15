@@ -1,5 +1,6 @@
 use super::input::Event;
 use super::input::handle_input;
+use crate::api::Artist;
 use crate::api::{Song, Album};
 use crate::api::download::download_pool::DownloadPool;
 use crate::api::download::musify_downloader::MusifyDownloader;
@@ -8,11 +9,10 @@ use crate::ui::{components, layout};
 use crossterm::event::{DisableMouseCapture, KeyEvent};
 use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen};
-use musicbrainz_rs::entity::artist;
 use std::io;
 use std::{io::Stdout, sync::mpsc::Receiver};
 use tui::{backend::CrosstermBackend, Terminal};
-use musicbrainz_rs::entity::release_group::ReleaseGroup;
+
 
 use crate::api::search::wrapper::{self, ArtistWrapper, SongWrapper, ReleaseGroupWrapper};
 
@@ -32,7 +32,7 @@ pub(crate) enum MainWindowState {
     Welcome,
     Results((Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)),
     SongFocus(Box<dyn Song>),
-    ArtistFocus(artist::Artist, Vec<ReleaseGroup>, Option<usize>),
+    ArtistFocus(Box<dyn Artist>, Option<usize>),
     RecordFocus(Box<dyn Album>, Option<usize>),
 }
 
@@ -133,8 +133,8 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                         f.render_widget(components::build_focus_toolbox(true), focus_layout[1]);
                     }
                     // The window for viewing details to an artist
-                    MainWindowState::ArtistFocus(a, r, index) => {
-                        f.render_widget(components::build_artist_focus(a, r, index, content_layout[1].height as usize - 3), content_layout[1]);
+                    MainWindowState::ArtistFocus(a, index) => {
+                        f.render_widget(components::build_artist_focus(a, index, content_layout[1].height as usize - 3), content_layout[1]);
                         f.render_widget(components::build_focus_toolbox(false), focus_layout[1]);
                     }
                     MainWindowState::Results(t) => {
