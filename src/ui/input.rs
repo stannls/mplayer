@@ -3,6 +3,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::{Duration, Instant};
+use crate::api::fs::FsArtist;
 use crate::api::search::remote::{album_from_release_group, unique_releases, album_from_release_group_id};
 use crate::api::search::wrapper::AlbumWrapper;
 use crate::ui::helpers;
@@ -185,42 +186,51 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                     }
                 _ => {}
             },
-            KeyCode::Enter => match ui_state.main_window_state.clone() {
-                MainWindowState::Results(r) => match ui_state.focused_result {
-                    FocusedResult::Song(id) => {
-                        ui_state.focused_result = FocusedResult::None;
-                        ui_state.last_search = Some(r.clone());
-                        ui_state.main_window_state =
-                            MainWindowState::SongFocus(Box::new(r.2.get(id).unwrap().clone()));
-                    }
-                    FocusedResult::Record(id) => {
-                        ui_state.focused_result = FocusedResult::None;
-                        ui_state.last_search = Some(r.clone());
-                        ui_state.main_window_state = {
-                            MainWindowState::RecordFocus(
-                                Box::new(AlbumWrapper::new(album_from_release_group(r.0.get(id).unwrap().clone().data).await)), None)
+            KeyCode::Enter => {
+                match ui_state.main_window_state.clone() {
+                    MainWindowState::Results(r) => match ui_state.focused_result {
+                        FocusedResult::Song(id) => {
+                            ui_state.focused_result = FocusedResult::None;
+                            ui_state.last_search = Some(r.clone());
+                            ui_state.main_window_state =
+                                MainWindowState::SongFocus(Box::new(r.2.get(id).unwrap().clone()));
                         }
+                        FocusedResult::Record(id) => {
+                            ui_state.focused_result = FocusedResult::None;
+                            ui_state.last_search = Some(r.clone());
+                            ui_state.main_window_state = {
+                                MainWindowState::RecordFocus(
+                                    Box::new(AlbumWrapper::new(album_from_release_group(r.0.get(id).unwrap().clone().data).await)), None)
+                            }
+                        }
+                        FocusedResult::Artist(id) => {
+                            ui_state.focused_result = FocusedResult::None;
+                            ui_state.last_search = Some(r.clone());
+                            let albums = unique_releases(r.1.get(id).unwrap().clone().data.id).await;
+                            ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(r.1.get(id).unwrap().releases(albums)), None);
+                        }
+                        _ => {}
+                    },
+                    MainWindowState::ArtistFocus(a, index) => if index.is_some() {ui_state.main_window_state =
+                        if a.get_albums().get(index.unwrap()).unwrap().is_groups() {
+                            MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(a.get_albums().get(index.unwrap()).unwrap().get_id()).await)), None)
+                        } else {
+                            MainWindowState::RecordFocus(a.get_albums().get(index.unwrap()).unwrap().to_owned(), None)};
+
+                    },
+                    MainWindowState::RecordFocus(r, index) => if index.is_some() {
+                        ui_state.main_window_state = MainWindowState::SongFocus(r.get_songs().get(index.unwrap()).unwrap().to_owned());
                     }
-                    FocusedResult::Artist(id) => {
-                        ui_state.focused_result = FocusedResult::None;
-                        ui_state.last_search = Some(r.clone());
-                        let albums = unique_releases(r.1.get(id).unwrap().clone().data.id).await;
-                        ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(r.1.get(id).unwrap().releases(albums)), None);
-                    }
+
                     _ => {}
-                },
-                MainWindowState::ArtistFocus(a, index) => if index.is_some() {ui_state.main_window_state =
-                    if a.get_albums().get(index.unwrap()).unwrap().is_groups() {
-                        MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(a.get_albums().get(index.unwrap()).unwrap().get_id()).await)), None)
-                    } else {
-                        MainWindowState::RecordFocus(a.get_albums().get(index.unwrap()).unwrap().to_owned(), None)};
-
-                },
-                MainWindowState::RecordFocus(r, index) => if index.is_some() {
-                    ui_state.main_window_state = MainWindowState::SongFocus(r.get_songs().get(index.unwrap()).unwrap().to_owned());
+                };
+                match ui_state.focused_result {
+                    FocusedResult::Libary(index) => {
+                        ui_state.focused_result = FocusedResult::None;
+                        ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(FsArtist::new(ui_state.artists.get(index).unwrap().to_owned()).unwrap()), None);
+                    },
+                    _ => {}
                 }
-
-                _ => {}
             },
             _ => {}
         }
