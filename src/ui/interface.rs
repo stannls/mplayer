@@ -1,3 +1,4 @@
+use super::components::ToolbarType;
 use super::input::Event;
 use super::input::handle_input;
 use crate::api::Artist;
@@ -124,18 +125,26 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                     }
                     // The window for viewing details to a song
                     MainWindowState::SongFocus(s) => {
-                        f.render_widget(components::build_song_focus(s), content_layout[1]);
-                        f.render_widget(components::build_focus_toolbox(true), focus_layout[1]);
+                        f.render_widget(components::build_song_focus(s.to_owned()), content_layout[1]);
+                        if s.is_local() {
+                            f.render_widget(components::build_focus_toolbox(ToolbarType::Play), focus_layout[1]);
+                        } else {
+                            f.render_widget(components::build_focus_toolbox(ToolbarType::Download), focus_layout[1]);
+                        }
                     }
                     // The window for viewing details to a record
                     MainWindowState::RecordFocus(r, index) => {
-                        f.render_widget(components::build_record_focus(r, index, content_layout[1].height as usize - 3), content_layout[1]);
-                        f.render_widget(components::build_focus_toolbox(true), focus_layout[1]);
+                        f.render_widget(components::build_record_focus(r.to_owned(), index, content_layout[1].height as usize - 3), content_layout[1]);
+                        if r.is_local(){
+                            f.render_widget(components::build_focus_toolbox(ToolbarType::Play), focus_layout[1]);
+                        } else{
+                            f.render_widget(components::build_focus_toolbox(ToolbarType::Download), focus_layout[1]);
+                        }
                     }
                     // The window for viewing details to an artist
                     MainWindowState::ArtistFocus(a, index) => {
                         f.render_widget(components::build_artist_focus(a, index, content_layout[1].height as usize - 3), content_layout[1]);
-                        f.render_widget(components::build_focus_toolbox(false), focus_layout[1]);
+                        f.render_widget(components::build_focus_toolbox(ToolbarType::Default), focus_layout[1]);
                     }
                     MainWindowState::Results(t) => {
                         // Determines which of the search results is focused

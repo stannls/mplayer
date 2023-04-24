@@ -21,6 +21,7 @@ pub fn scan_artists() -> Vec<String> {
 #[derive(Clone)]
 pub struct FsArtist {
     path: PathBuf,
+    albums: Vec<Box<dyn super::Album>>,
 }
 
 impl FsArtist {
@@ -28,17 +29,19 @@ impl FsArtist {
         let mut path = audio_dir().unwrap();
         path.push("mplayer");
         path.push(name);
-        Some(FsArtist { path })
+
+        let albums = fs::read_dir(path.to_owned())
+            .unwrap()
+            .into_iter()
+            .map(|f| Box::new(FsAlbum::new(f.unwrap().path()).unwrap()) as Box<dyn Album>)
+            .collect();
+        Some(FsArtist { path, albums })
     }
 }
 
 impl Artist for FsArtist {
     fn get_albums(&self) -> Vec<Box<dyn super::Album>> {
-        fs::read_dir(self.path.to_owned())
-            .unwrap()
-            .into_iter()
-            .map(|f| Box::new(FsAlbum::new(f.unwrap().path()).unwrap()) as Box<dyn Album>)
-            .collect()
+        self.albums.to_owned()
     }
 
     fn get_name(&self) -> String {
@@ -92,6 +95,10 @@ impl Album for FsAlbum {
     fn get_id(&self) -> String {
         "".to_string()
     }
+
+    fn is_local(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Clone)]
@@ -143,5 +150,13 @@ impl Song for FsSong {
 
     fn get_number(&self) -> Option<String> {
         Some(self.number.to_string())
+    }
+
+    fn is_local(&self) -> bool {
+        false
+    }
+
+    fn get_filepath(&self) -> Option<PathBuf> {
+        Some(self.path.to_owned())
     }
 }

@@ -6,6 +6,12 @@ use tui::{
     widgets::{Block, Borders, Paragraph, Row, Table},
 };
 
+pub enum ToolbarType {
+    Default,
+    Download,
+    Play,
+}
+
 // The main window
 pub fn build_window_border() -> Block<'static> {
     Block::default().title("mplayer").borders(Borders::ALL)
@@ -42,11 +48,11 @@ pub fn build_searchbar(searchbar_content: Option<String>) -> Paragraph<'static> 
 }
 
 // The Toolbar that is show when selecting a search result
-pub fn build_focus_toolbox(download: bool) -> Paragraph<'static> {
-    Paragraph::new(if download {
-        "[b]ack [d]ownload [↑]up [↓]down [enter]select".to_string()
-    } else {
-        "[b]ack [↑]up [↓]down [enter]select".to_string()
+pub fn build_focus_toolbox(toolbar_type: ToolbarType) -> Paragraph<'static> {
+    Paragraph::new(match toolbar_type {
+        ToolbarType::Download => "[b]ack [d]ownload [↑]up [↓]down [enter]select".to_string(),
+        ToolbarType::Play => "[b]ack [p]lay [↑]up [↓]down [enter]select".to_string(),
+        ToolbarType::Default => "[b]ack [↑]up [↓]down [enter]select".to_string(),
     })
 }
 

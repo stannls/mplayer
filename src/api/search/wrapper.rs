@@ -104,6 +104,14 @@ impl Song for SongWrapper {
         let minutes = (t.num_seconds() / 60) % 60;
         format!("{:0>2}:{:0>2}", minutes, seconds)
     }
+
+    fn is_local(&self) -> bool {
+        false
+    }
+
+    fn get_filepath(&self) -> Option<std::path::PathBuf> {
+        None
+    }
 }
 
 #[derive(Clone)]
@@ -149,6 +157,10 @@ impl Album for ReleaseGroupWrapper {
     fn get_id(&self) -> String {
         self.data.id.to_owned()
     }
+
+    fn is_local(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]
@@ -192,6 +204,10 @@ impl Album for AlbumWrapper {
     fn get_id(&self) -> String {
         self.data.id.to_owned()
     }
+
+    fn is_local(&self) -> bool {
+        false
+    }
 }
 
 pub trait SearchEntity {
@@ -234,6 +250,14 @@ impl Song for TrackWrapper {
             .to_owned()
     }
     fn get_disambiguation(&self) -> Option<String> {
+        None
+    }
+
+    fn is_local(&self) -> bool {
+        false
+    }
+
+    fn get_filepath(&self) -> Option<std::path::PathBuf> {
         None
     }
 }
