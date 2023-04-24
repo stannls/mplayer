@@ -153,7 +153,7 @@ impl Song for FsSong {
     }
 
     fn is_local(&self) -> bool {
-        false
+        true
     }
 
     fn get_filepath(&self) -> Option<PathBuf> {

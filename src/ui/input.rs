@@ -4,6 +4,7 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::{Duration, Instant};
 use crate::api::fs::FsArtist;
+use crate::api::player::MusicPlayer;
 use crate::api::search::remote::{album_from_release_group, unique_releases, album_from_release_group_id};
 use crate::api::search::wrapper::AlbumWrapper;
 use crate::ui::helpers;
@@ -42,7 +43,7 @@ pub fn create_input_channel() -> Receiver<Event<KeyEvent>> {
     rx
 }
 
-pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downloader: &DownloadPool) {
+pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downloader: &DownloadPool, music_player: &MusicPlayer) {
     // Match arm for inputting text
     if ui_state.searching {
         handle_search_input(input, ui_state).await
@@ -57,7 +58,12 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                     downloader.download_songs(r.get_songs())
                 },
                 _ => {}
-            }
+            },
+            KeyCode::Char('p') => match ui_state.main_window_state.to_owned() {
+                MainWindowState::SongFocus(s) => music_player.play_song(s),
+                MainWindowState::RecordFocus(r, _) => music_player.play_album(r),
+                _ => {}
+            },
             KeyCode::Char('q') => ui_state.quit = true,
             KeyCode::Char('s') => {
                 ui_state.searching = true;

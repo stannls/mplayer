@@ -2,6 +2,7 @@ use super::components::ToolbarType;
 use super::input::Event;
 use super::input::handle_input;
 use crate::api::Artist;
+use crate::api::player::MusicPlayer;
 use crate::api::{Song, Album};
 use crate::api::download::download_pool::DownloadPool;
 use crate::api::download::musify_downloader::MusifyDownloader;
@@ -90,7 +91,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     let mut ui_state = UiState::new();
     let downloader = DownloadPool::new(4)
         .add_downloader(MusifyDownloader::new());
-
+    let music_player = MusicPlayer::new();
     // Main UI render loop
     while !ui_state.quit {
         terminal
@@ -172,7 +173,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 
         // Handles keyboard input
         match rx.recv().unwrap() {
-            Event::Input(event) => handle_input(event, &mut ui_state, &downloader).await,
+            Event::Input(event) => handle_input(event, &mut ui_state, &downloader, &music_player).await,
             _ => {}
         }
         ui_state.artists = scan_artists();
