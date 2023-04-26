@@ -64,6 +64,8 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                 MainWindowState::RecordFocus(r, _) => music_player.play_album(r),
                 _ => {}
             },
+            KeyCode::Char(' ') => music_player.pause(),
+            KeyCode::Char('n') => music_player.skip(),
             KeyCode::Char('q') => ui_state.quit = true,
             KeyCode::Char('s') => {
                 ui_state.searching = true;
