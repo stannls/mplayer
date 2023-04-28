@@ -18,5 +18,6 @@ async fn main() -> Result<(), io::Error> {
 
     // restore terminal
     interface::restore_terminal(&mut terminal)?;
+
     Ok(())
 }

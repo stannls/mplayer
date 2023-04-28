@@ -1,6 +1,7 @@
 pub mod musify_downloader;
 pub mod download_pool;
 pub mod file_sorter;
+pub mod bandcamp_downloader;
 
 use async_trait::async_trait;
 

@@ -2,6 +2,7 @@ use super::components::ToolbarType;
 use super::input::Event;
 use super::input::handle_input;
 use crate::api::Artist;
+use crate::api::download::bandcamp_downloader::BandcampDownloader;
 use crate::api::player::MusicPlayer;
 use crate::api::{Song, Album};
 use crate::api::download::download_pool::DownloadPool;
@@ -90,7 +91,8 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     // Init for ui state and the downloader
     let mut ui_state = UiState::new();
     let downloader = DownloadPool::new(4)
-        .add_downloader(MusifyDownloader::new());
+        .add_downloader(MusifyDownloader::new())
+        .add_downloader(BandcampDownloader::new());
     let music_player = MusicPlayer::new();
     // Main UI render loop
     while !ui_state.quit {
