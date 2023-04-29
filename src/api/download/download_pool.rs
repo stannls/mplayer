@@ -43,7 +43,7 @@ impl DownloadPool {
             };
             let rt = Runtime::new().unwrap();
             let filepath = rt.block_on(try_all_downloaders()).unwrap();
-            fs.move_file(filepath).unwrap();
+            fs.move_and_tag_file(filepath, recording).unwrap();
         });
     }
     pub fn download_songs(&self, recordings: Vec<Box<dyn Song>>) {

@@ -33,11 +33,12 @@ pub async fn search_songs(query: String) -> Result<Vec<wrapper::SongWrapper>, Er
     let res = Recording::search(q)
         .with_isrcs()
         .with_artists()
+        .with_releases()
         .execute()
         .await?
         .entities
         .into_iter()
-        .map(|f| wrapper::SongWrapper::new(f))
+        .map(|f| wrapper::SongWrapper::new(f.to_owned(), f.releases.unwrap().get(0).unwrap().title.to_owned()))
         .collect();
     Ok(res)
 }

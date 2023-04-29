@@ -5,6 +5,7 @@ use std::io;
 use ui::interface;
 use ui::{input::create_input_channel, interface::setup_terminal};
 
+
 #[tokio::main]
 async fn main() -> Result<(), io::Error> {
     // setup input handler

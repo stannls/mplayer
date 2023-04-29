@@ -49,11 +49,15 @@ impl Artist for ArtistWrapper {
 #[derive(Clone)]
 pub struct SongWrapper {
     pub data: recording::Recording,
+    album_name: String,
 }
 
 impl SongWrapper {
-    pub fn new(recording: recording::Recording) -> SongWrapper {
-        SongWrapper { data: recording }
+    pub fn new(recording: recording::Recording, album_name: String) -> SongWrapper {
+        SongWrapper {
+            data: recording,
+            album_name,
+        }
     }
 }
 
@@ -111,6 +115,10 @@ impl Song for SongWrapper {
 
     fn get_filepath(&self) -> Option<std::path::PathBuf> {
         None
+    }
+
+    fn get_album_name(&self) -> String {
+        self.album_name.to_owned()
     }
 }
 
@@ -187,14 +195,14 @@ impl Album for AlbumWrapper {
             if m.format.to_owned().unwrap() == "CD" {
                 let mut songs: Vec<Box<dyn Song>> = vec![];
                 for s in media.get(0).unwrap().tracks.to_owned().unwrap() {
-                    songs.push(Box::new(TrackWrapper::new(s)));
+                    songs.push(Box::new(TrackWrapper::new(s, self.get_name())));
                 }
                 return songs;
             }
         }
         let mut songs: Vec<Box<dyn Song>> = vec![];
         for s in media.get(0).unwrap().tracks.to_owned().unwrap() {
-            songs.push(Box::new(TrackWrapper::new(s)));
+            songs.push(Box::new(TrackWrapper::new(s, self.get_name())));
         }
         songs
     }
@@ -217,11 +225,16 @@ pub trait SearchEntity {
 #[derive(Clone)]
 pub struct TrackWrapper {
     data: Track,
+    // Needs to be stored here, because else there is no easy way to access the album title
+    album_name: String,
 }
 
 impl TrackWrapper {
-    pub fn new(d: Track) -> TrackWrapper {
-        TrackWrapper { data: d }
+    pub fn new(d: Track, album_name: String) -> TrackWrapper {
+        TrackWrapper {
+            data: d,
+            album_name,
+        }
     }
 }
 
@@ -259,5 +272,9 @@ impl Song for TrackWrapper {
 
     fn get_filepath(&self) -> Option<std::path::PathBuf> {
         None
+    }
+
+    fn get_album_name(&self) -> String {
+        self.album_name.to_owned()
     }
 }

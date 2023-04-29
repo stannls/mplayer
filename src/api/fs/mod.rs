@@ -107,6 +107,7 @@ pub struct FsSong {
     title: String,
     length: f64,
     number: u16,
+    album_name: String,
 }
 
 impl FsSong {
@@ -117,6 +118,7 @@ impl FsSong {
             title: tags.title().unwrap().to_string(),
             length: mp3_duration::from_path(&path).unwrap().as_millis() as f64,
             number: tags.track_number().unwrap(),
+            album_name: tags.album_title().unwrap_or("").to_string(),
         })
     }
 }
@@ -158,5 +160,9 @@ impl Song for FsSong {
 
     fn get_filepath(&self) -> Option<PathBuf> {
         Some(self.path.to_owned())
+    }
+
+    fn get_album_name(&self) -> String {
+        self.album_name.to_owned()
     }
 }
