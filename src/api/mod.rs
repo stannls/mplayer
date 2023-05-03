@@ -16,6 +16,7 @@ dyn_clone::clone_trait_object!(Artist);
 pub trait Song: DynClone + Send {
     fn get_title(&self) -> String;
     fn get_length(&self) -> String;
+    fn get_length_secs(&self) -> usize;
     fn get_disambiguation(&self) -> Option<String>;
     fn get_artist_name(&self) -> String;
     fn get_number(&self) -> Option<String>;

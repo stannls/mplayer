@@ -1,9 +1,12 @@
 use super::scroll_components::ScrollTable;
-use crate::api::{search::wrapper, Album, Artist, Song};
+use crate::api::{player::SongInfo, search::wrapper, Album, Artist, Song};
 
 use tui::{
     layout::Constraint,
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    style::{Color, Modifier, Style},
+    text::Span,
+    text::Spans,
+    widgets::{Block, Borders, Gauge, Paragraph, Row, Table},
 };
 
 pub enum ToolbarType {
@@ -156,4 +159,36 @@ pub fn build_record_focus(
             Constraint::Percentage(90),
             Constraint::Percentage(8),
         ])
+}
+
+pub fn build_song_info(song_info: &SongInfo) -> Paragraph<'static> {
+    Paragraph::new(vec![
+        Spans::from(format!("{} - {}", song_info.name, song_info.artist)),
+        Spans::from(vec![
+            Span::styled("on ", Style::default().add_modifier(Modifier::ITALIC)),
+            Span::raw(song_info.album.to_owned()),
+        ]),
+        Spans::from(format!(
+            "{}/{}",
+            song_info.played_time().unwrap(),
+            song_info.length
+        )),
+    ])
+}
+
+pub fn build_progress_bar(song_info: &SongInfo) -> Gauge<'static> {
+    Gauge::default()
+        .ratio(song_info.played_time().unwrap() as f64 / song_info.length as f64)
+        .gauge_style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::ITALIC),
+        )
+        .label(format!(
+            "{:0>2}:{:0>2}/{:0>2}:{:0>2}",
+            (song_info.played_time().unwrap() / 60) % 60,
+            song_info.played_time().unwrap() % 60,
+            (song_info.length / 60) % 60,
+            song_info.length % 60
+        ))
 }

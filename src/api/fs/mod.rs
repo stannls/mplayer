@@ -135,6 +135,11 @@ impl Song for FsSong {
         format!("{:0>2}:{:0>2}", minutes, seconds)
     }
 
+    fn get_length_secs(&self) -> usize {
+        let t = Duration::milliseconds(self.length as i64);
+        t.num_seconds() as usize
+    }
+
     fn get_disambiguation(&self) -> Option<String> {
         None
     }
@@ -144,6 +149,8 @@ impl Song for FsSong {
             .parent()
             .unwrap()
             .parent()
+            .unwrap()
+            .file_name()
             .unwrap()
             .to_str()
             .unwrap()

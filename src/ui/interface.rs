@@ -8,6 +8,7 @@ use crate::api::{Song, Album};
 use crate::api::download::download_pool::DownloadPool;
 use crate::api::download::musify_downloader::MusifyDownloader;
 use crate::api::fs::scan_artists;
+use crate::main;
 use crate::ui::{components, layout};
 use crossterm::event::{DisableMouseCapture, KeyEvent};
 use crossterm::execute;
@@ -98,10 +99,11 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     while !ui_state.quit {
         terminal
             .draw(|f| {
+                let current_song = music_player.get_song_info();
 
                 // Layouting
                 let size = f.size();
-                let main_layout = layout::build_main_layout().split(size);
+                let main_layout = layout::build_main_layout(current_song.is_some()).split(size);
                 let content_layout = layout::build_content_layout().split(main_layout[1]);
                 let focus_layout = layout::build_focus_layout().split(content_layout[1]);
                 let result_layout = layout::build_search_layout(content_layout[1]);
@@ -169,6 +171,15 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                         // Playlsist search results (Not implemented)
                         f.render_widget(components::build_result_box::<wrapper::ArtistWrapper>("[P]laylist".to_string(), vec![], scroll_value.3, displayable_results),result_layout[3]);
                     }
+                }
+
+                // The song info of the currently played song
+                if current_song.is_some() {
+                    let play_layout = layout::build_play_layout().split(main_layout[2]);
+                    let current_song = current_song.unwrap();
+                    let song_info = components::build_song_info(&current_song);
+                    f.render_widget(song_info, play_layout[0]);
+                    f.render_widget(components::build_progress_bar(&current_song), play_layout[1])
                 }
             })
         .unwrap();

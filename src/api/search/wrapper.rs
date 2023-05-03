@@ -120,6 +120,11 @@ impl Song for SongWrapper {
     fn get_album_name(&self) -> String {
         self.album_name.to_owned()
     }
+
+    fn get_length_secs(&self) -> usize {
+        let t = Duration::milliseconds(self.data.length.unwrap() as i64);
+        t.num_seconds() as usize
+    }
 }
 
 #[derive(Clone)]
@@ -276,5 +281,10 @@ impl Song for TrackWrapper {
 
     fn get_album_name(&self) -> String {
         self.album_name.to_owned()
+    }
+
+    fn get_length_secs(&self) -> usize {
+        let t = Duration::milliseconds(self.data.length.unwrap() as i64);
+        t.num_seconds() as usize
     }
 }
