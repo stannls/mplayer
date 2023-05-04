@@ -9,6 +9,7 @@ use super::{Album, Artist, Song};
 pub fn scan_artists() -> Vec<String> {
     let mut dir = audio_dir().unwrap();
     dir.push("mplayer");
+    fs::create_dir_all(&dir).unwrap();
     let mut artists: Vec<String> = fs::read_dir(dir)
         .unwrap()
         .into_iter()
