@@ -182,6 +182,7 @@ pub fn build_progress_bar(song_info: &SongInfo) -> Gauge<'static> {
         .gauge_style(
             Style::default()
                 .fg(Color::White)
+                .bg(Color::DarkGray)
                 .add_modifier(Modifier::ITALIC),
         )
         .label(format!(

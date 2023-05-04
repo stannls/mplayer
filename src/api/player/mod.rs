@@ -143,6 +143,9 @@ impl MusicPlayer {
                     sink.append(song.0);
                     let mut guard = current_song.lock().unwrap();
                     *guard = Some(song.1.set_start(Instant::now()));
+                } else if sink.empty() && current_song.lock().unwrap().is_some() {
+                    let mut guard = current_song.lock().unwrap();
+                    *guard = None;
                 }
                 thread::sleep(Duration::from_millis(50))
             }
