@@ -8,7 +8,7 @@ use crate::api::{Song, Album};
 use crate::api::download::download_pool::DownloadPool;
 use crate::api::download::musify_downloader::MusifyDownloader;
 use crate::api::fs::scan_artists;
-use crate::main;
+
 use crate::ui::{components, layout};
 use crossterm::event::{DisableMouseCapture, KeyEvent};
 use crossterm::execute;

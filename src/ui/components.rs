@@ -177,8 +177,9 @@ pub fn build_song_info(song_info: &SongInfo) -> Paragraph<'static> {
 }
 
 pub fn build_progress_bar(song_info: &SongInfo) -> Gauge<'static> {
+    let progress = song_info.played_time().unwrap() as f64 / song_info.length as f64;
     Gauge::default()
-        .ratio(song_info.played_time().unwrap() as f64 / song_info.length as f64)
+        .ratio(if progress < 1.0 { progress } else { 1.0 })
         .gauge_style(
             Style::default()
                 .fg(Color::White)
