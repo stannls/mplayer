@@ -95,7 +95,7 @@ pub fn build_artist_focus(
                 .title(artist.get_name()),
         )
         .header(Row::new(vec!["Title", "Release Date"]))
-        .widths(&[Constraint::Percentage(80), Constraint::Percentage(20)])
+        .widths(&[Constraint::Max(u16::MAX), Constraint::Length(20)])
 }
 
 pub fn build_song_focus(song: Box<dyn Song>) -> Table<'static> {
@@ -125,9 +125,9 @@ pub fn build_song_focus(song: Box<dyn Song>) -> Table<'static> {
         )
         .header(Row::new(vec!["#", "Title", "Length"]))
         .widths(&[
-            Constraint::Percentage(2),
-            Constraint::Percentage(90),
-            Constraint::Percentage(8),
+            Constraint::Length(3),
+            Constraint::Max(u16::MAX),
+            Constraint::Length(8),
         ]);
 }
 
@@ -159,9 +159,9 @@ pub fn build_record_focus(
                 .title(record.get_name()),
         )
         .widths(&[
-            Constraint::Percentage(2),
-            Constraint::Percentage(90),
-            Constraint::Percentage(8),
+            Constraint::Length(3),
+            Constraint::Max(u16::MAX),
+            Constraint::Length(8),
         ])
 }
 

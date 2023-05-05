@@ -25,7 +25,7 @@ pub fn build_content_layout() -> Layout {
     Layout::default()
         .direction(Direction::Horizontal)
         .margin(0)
-        .constraints([Constraint::Length(30), Constraint::Min(2)].as_ref())
+        .constraints([Constraint::Length(30), Constraint::Min(1)].as_ref())
 }
 
 pub fn build_search_layout(parent_layout: Rect) -> Vec<Rect> {
@@ -33,7 +33,7 @@ pub fn build_search_layout(parent_layout: Rect) -> Vec<Rect> {
         .direction(Direction::Horizontal)
         .margin(0)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(parent_layout);
+        .split(parent_layout.to_owned());
     Layout::default()
         .direction(Direction::Vertical)
         .margin(0)
@@ -48,6 +48,7 @@ pub fn build_search_layout(parent_layout: Rect) -> Vec<Rect> {
                 .split(split[1])
                 .into_iter(),
         )
+        .map(|f| *f)
         .collect()
 }
 

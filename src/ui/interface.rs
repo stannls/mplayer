@@ -8,10 +8,11 @@ use crate::api::{Song, Album};
 use crate::api::download::download_pool::DownloadPool;
 use crate::api::download::musify_downloader::MusifyDownloader;
 use crate::api::fs::scan_artists;
-
 use crate::ui::{components, layout};
+use crossterm::event::EnableMouseCapture;
 use crossterm::event::{DisableMouseCapture, KeyEvent};
 use crossterm::execute;
+use crossterm::terminal::EnterAlternateScreen;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen};
 use std::io;
 use std::{io::Stdout, sync::mpsc::Receiver};
@@ -69,6 +70,8 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>, io::Error>
     let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+    enable_raw_mode()?;
+    execute!(io::stderr(), EnterAlternateScreen, EnableMouseCapture)?;
     terminal.hide_cursor()?;
     terminal.clear()?;
     Ok(terminal)
@@ -83,7 +86,6 @@ pub fn restore_terminal(
         LeaveAlternateScreen,
         DisableMouseCapture
         )?;
-    terminal.clear()?;
     terminal.show_cursor()?;
     Ok(())
 }
@@ -169,7 +171,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                         // Artist search results
                         f.render_widget(components::build_result_box("[A]rtist".to_string(), t.1, scroll_value.2, displayable_results), result_layout[1]);
                         // Playlsist search results (Not implemented)
-                        f.render_widget(components::build_result_box::<wrapper::ArtistWrapper>("[P]laylist".to_string(), vec![], scroll_value.3, displayable_results),result_layout[3]);
+                        f.render_widget(components::build_result_box::<wrapper::ArtistWrapper>("[P]laylist".to_string(), vec![], scroll_value.3, displayable_results), result_layout[3]);
                     }
                 }
 
