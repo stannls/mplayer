@@ -103,7 +103,10 @@ pub async fn unique_releases(artist_id: String) -> Vec<ReleaseGroup> {
         .execute()
         .await
         .unwrap()
-        .entities;
+        .entities
+        .into_iter()
+        .filter(|f| matches!(f.first_release_date, Option::Some(_)))
+        .collect::<Vec<ReleaseGroup>>();
     release_groups.sort_by(|a, b| b.first_release_date.unwrap().cmp(&a.first_release_date.unwrap()));
     release_groups
 }
