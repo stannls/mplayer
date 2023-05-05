@@ -38,6 +38,7 @@ pub async fn search_songs(query: String) -> Result<Vec<wrapper::SongWrapper>, Er
         .await?
         .entities
         .into_iter()
+        .filter(|f| matches!(f.releases.as_ref(), Option::Some(_)))
         .map(|f| wrapper::SongWrapper::new(f.to_owned(), f.releases.unwrap().get(0).unwrap().title.to_owned()))
         .collect();
     Ok(res)
