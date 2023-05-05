@@ -5,7 +5,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use crate::api::fs::FsArtist;
 use crate::api::player::MusicPlayer;
-use crate::api::search::remote::{album_from_release_group, unique_releases, album_from_release_group_id};
+use crate::api::search::remote::{unique_releases, album_from_release_group_id};
 use crate::api::search::wrapper::AlbumWrapper;
 use crate::ui::helpers;
 use super::interface::{UiState, MainWindowState, FocusedResult};

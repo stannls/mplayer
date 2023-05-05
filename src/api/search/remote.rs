@@ -62,25 +62,6 @@ pub async fn search_albums(query: String) -> Result<Vec<wrapper::ReleaseGroupWra
     Ok(res)
 }
 
-pub async fn album_from_release_group(release_group: ReleaseGroup) -> release::Release {
-    let id = release_group
-        .releases
-        .unwrap()
-        .get(0)
-        .unwrap()
-        .id
-        .to_owned();
-    release::Release::fetch()
-        .id(id.as_str())
-        .with_annotations()
-        .with_recording_level_relations()
-        .with_recordings()
-        .with_artist_credits()
-        .execute()
-        .await
-        .unwrap()
-}
-
 pub async fn album_from_release_group_id(release_group_id: &str) -> release::Release{
     let releases = Release::browse()
         .by_release_group(&release_group_id)
