@@ -1,7 +1,7 @@
 use crate::api::search::wrapper;
 use musicbrainz_rs::entity::artist::{Artist, ArtistSearchQuery};
 use musicbrainz_rs::entity::recording::{Recording, RecordingSearchQuery};
-use musicbrainz_rs::entity::release::{self, Release};
+use musicbrainz_rs::entity::release::{self, Release, ReleasePackaging};
 use musicbrainz_rs::entity::release_group::{ReleaseGroup, ReleaseGroupSearchQuery};
 use musicbrainz_rs::prelude::*;
 use reqwest::Error;
@@ -81,8 +81,8 @@ pub async fn album_from_release_group(release_group: ReleaseGroup) -> release::R
         .unwrap()
 }
 
-pub async fn album_from_release_group_id(release_group_id: String) -> release::Release{
-    Release::browse()
+pub async fn album_from_release_group_id(release_group_id: &str) -> release::Release{
+    let releases = Release::browse()
         .by_release_group(&release_group_id)
         .with_annotations()
         .with_recording_level_relations()
@@ -90,11 +90,15 @@ pub async fn album_from_release_group_id(release_group_id: String) -> release::R
         .with_artist_credits()
         .execute()
         .await
-        .unwrap()
-        .entities
-        .get(0)
-        .unwrap()
-        .clone()
+        .unwrap();
+    // This tries to filter out vinyls, cassettes and other media formats with weird track listings
+    let first_release = releases.entities.get(0).unwrap();
+    let best_release_candidates = releases.entities.to_owned().into_iter()
+        .filter(|f| matches!(f.packaging.to_owned(), Option::Some(_)))
+        .filter(|f| !matches!(f.packaging.to_owned().unwrap(), ReleasePackaging::CardboardPaperSleeve))
+        .filter(|f| !matches!(f.packaging.to_owned().unwrap(), ReleasePackaging::CassetteCase))
+        .collect::<Vec<release::Release>>();
+    best_release_candidates.get(0).unwrap_or(first_release).to_owned()
 }
 
 pub async fn unique_releases(artist_id: String) -> Vec<ReleaseGroup> {

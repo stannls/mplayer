@@ -112,7 +112,11 @@ pub fn build_song_focus(song: Box<dyn Song>) -> Table<'static> {
             _ => format!(""),
         }
     );
-    let content = Row::new(vec![String::from("1"), title, song.get_length()]);
+    let content = Row::new(vec![
+        String::from("1"),
+        title,
+        song.get_length().unwrap_or("00:00".to_string()),
+    ]);
     return Table::new(vec![content])
         .block(
             Block::default()
@@ -139,7 +143,7 @@ pub fn build_record_focus(
             vec![
                 f.get_number().unwrap_or("".to_string()),
                 f.get_title(),
-                f.get_length(),
+                f.get_length().unwrap_or("00:00".to_string()),
             ]
         })
         .collect();

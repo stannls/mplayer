@@ -129,16 +129,16 @@ impl Song for FsSong {
         self.title.to_owned()
     }
 
-    fn get_length(&self) -> String {
+    fn get_length(&self) -> Option<String> {
         let t = Duration::milliseconds(self.length as i64);
         let seconds = t.num_seconds() % 60;
         let minutes = (t.num_seconds() / 60) % 60;
-        format!("{:0>2}:{:0>2}", minutes, seconds)
+        Some(format!("{:0>2}:{:0>2}", minutes, seconds))
     }
 
-    fn get_length_secs(&self) -> usize {
+    fn get_length_secs(&self) -> Option<usize> {
         let t = Duration::milliseconds(self.length as i64);
-        t.num_seconds() as usize
+        Some(t.num_seconds() as usize)
     }
 
     fn get_disambiguation(&self) -> Option<String> {

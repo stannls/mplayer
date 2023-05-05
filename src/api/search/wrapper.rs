@@ -102,11 +102,11 @@ impl Song for SongWrapper {
             .name
             .to_owned()
     }
-    fn get_length(&self) -> String {
-        let t = Duration::milliseconds(self.data.length.unwrap() as i64);
+    fn get_length(&self) -> Option<String> {
+        let t = Duration::milliseconds(self.data.length? as i64);
         let seconds = t.num_seconds() % 60;
         let minutes = (t.num_seconds() / 60) % 60;
-        format!("{:0>2}:{:0>2}", minutes, seconds)
+        Some(format!("{:0>2}:{:0>2}", minutes, seconds))
     }
 
     fn is_local(&self) -> bool {
@@ -121,9 +121,9 @@ impl Song for SongWrapper {
         self.album_name.to_owned()
     }
 
-    fn get_length_secs(&self) -> usize {
-        let t = Duration::milliseconds(self.data.length.unwrap() as i64);
-        t.num_seconds() as usize
+    fn get_length_secs(&self) -> Option<usize> {
+        let t = Duration::milliseconds(self.data.length? as i64);
+        Some(t.num_seconds() as usize)
     }
 }
 
@@ -247,11 +247,11 @@ impl Song for TrackWrapper {
     fn get_title(&self) -> String {
         self.data.title.to_owned()
     }
-    fn get_length(&self) -> String {
-        let t = Duration::milliseconds(self.data.length.unwrap() as i64);
+    fn get_length(&self) -> Option<String> {
+        let t = Duration::milliseconds(self.data.length? as i64);
         let seconds = t.num_seconds() % 60;
         let minutes = (t.num_seconds() / 60) % 60;
-        format!("{:0>2}:{:0>2}", minutes, seconds)
+        Some(format!("{:0>2}:{:0>2}", minutes, seconds))
     }
     fn get_number(&self) -> Option<String> {
         Some(self.data.number.to_owned())
@@ -283,8 +283,8 @@ impl Song for TrackWrapper {
         self.album_name.to_owned()
     }
 
-    fn get_length_secs(&self) -> usize {
-        let t = Duration::milliseconds(self.data.length.unwrap() as i64);
-        t.num_seconds() as usize
+    fn get_length_secs(&self) -> Option<usize> {
+        let t = Duration::milliseconds(self.data.length? as i64);
+        Some(t.num_seconds() as usize)
     }
 }

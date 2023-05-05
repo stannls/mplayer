@@ -163,7 +163,7 @@ impl MusicPlayer {
                     song.get_title(),
                     song.get_artist_name(),
                     song.get_album_name(),
-                    song.get_length_secs(),
+                    song.get_length_secs().unwrap(),
                 ),
             )))
             .unwrap();
@@ -181,7 +181,7 @@ impl MusicPlayer {
                         song.get_title(),
                         song.get_artist_name(),
                         song.get_album_name(),
-                        song.get_length_secs(),
+                        song.get_length_secs().unwrap(),
                     ),
                 )))
                 .unwrap();
