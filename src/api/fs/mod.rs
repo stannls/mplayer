@@ -117,7 +117,9 @@ impl FsSong {
         Some(FsSong {
             path: path.to_owned(),
             title: tags.title().unwrap().to_string(),
-            length: mp3_duration::from_path(&path).unwrap().as_millis() as f64,
+            length: mp3_duration::from_path(&path)
+                .unwrap_or(std::time::Duration::from_secs(0))
+                .as_millis() as f64,
             number: tags.track_number().unwrap(),
             album_name: tags.album_title().unwrap_or("").to_string(),
         })

@@ -60,8 +60,8 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                 _ => {}
             },
             KeyCode::Char('p') => match ui_state.main_window_state.to_owned() {
-                MainWindowState::SongFocus(s) => music_player.play_song(s),
-                MainWindowState::RecordFocus(r, _) => music_player.play_album(r),
+                MainWindowState::SongFocus(s) => if s.is_local() {music_player.play_song(s)},
+                MainWindowState::RecordFocus(r, _) => if r.is_local() {music_player.play_album(r)},
                 _ => {}
             },
             KeyCode::Char(' ') => music_player.pause(),
