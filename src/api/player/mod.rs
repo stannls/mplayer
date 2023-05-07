@@ -152,10 +152,12 @@ impl MusicPlayer {
         });
     }
     // Emptys queue, plays song
-    pub fn play_song(&self, song: Box<dyn Song>) {
+    pub fn play_song(&self, song: Box<dyn Song>, stop_playback: bool) {
         let file = BufReader::new(File::open(song.get_filepath().unwrap()).unwrap());
         let source = Decoder::new(file).unwrap();
-        self.stop();
+        if stop_playback {
+            self.stop();
+        }
         self.sender
             .send(MusicPlayerEvent::Play((
                 source,
@@ -169,8 +171,10 @@ impl MusicPlayer {
             .unwrap();
     }
     // Emptys queue, enqueues album
-    pub fn play_album(&self, album: Box<dyn Album>) {
-        self.stop();
+    pub fn play_album(&self, album: Box<dyn Album>, stop_playback: bool) {
+        if stop_playback {
+            self.stop();
+        }
         for song in album.get_songs() {
             let file = BufReader::new(File::open(song.get_filepath().unwrap()).unwrap());
             let source = Decoder::new(file).unwrap();
