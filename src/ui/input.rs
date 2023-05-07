@@ -73,6 +73,8 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
             KeyCode::Char('n') => music_player.skip(),
             KeyCode::Char('v') => music_player.stop(),
             KeyCode::Char('q') => ui_state.quit = true,
+            KeyCode::Char('+') => music_player.change_volume(0.1),
+            KeyCode::Char('-') => music_player.change_volume(-0.1),
             KeyCode::Char('s') => {
                 ui_state.searching = true;
                 ui_state.focused_result = FocusedResult::None;

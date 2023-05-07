@@ -21,6 +21,7 @@ pub enum MusicPlayerEvent {
     Play((Decoder<BufReader<File>>, SongInfo)),
     Skip,
     Pause,
+    Volume(f32),
     None,
 }
 
@@ -135,6 +136,15 @@ impl MusicPlayer {
                             sink.pause();
                         }
                     }
+                    MusicPlayerEvent::Volume(v) => {
+                        if sink.volume() + v > 1.0 {
+                            sink.set_volume(1.0);
+                        } else if sink.volume() + v < 0.0 {
+                            sink.set_volume(0.0);
+                        } else {
+                            sink.set_volume(sink.volume() + v);
+                        }
+                    }
                     MusicPlayerEvent::None => {}
                 }
                 // Event for playing a new song after the last is finished
@@ -205,5 +215,10 @@ impl MusicPlayer {
     }
     pub fn get_song_info(&self) -> Option<SongInfo> {
         self.current_song.lock().unwrap().deref().to_owned()
+    }
+    pub fn change_volume(&self, modifier: f32) {
+        self.sender
+            .send(MusicPlayerEvent::Volume(modifier))
+            .unwrap();
     }
 }
