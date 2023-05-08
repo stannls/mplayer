@@ -141,7 +141,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                     }
                     // The window for viewing details to a record
                     MainWindowState::RecordFocus(r, index) => {
-                        f.render_widget(components::build_record_focus(r.to_owned(), index, content_layout[1].height as usize - 3), content_layout[1]);
+                        f.render_widget(components::build_record_focus(r.to_owned(), index, content_layout[1].height as usize - 3, &current_song), content_layout[1]);
                         if r.is_local(){
                             f.render_widget(components::build_focus_toolbox(ToolbarType::Play), focus_layout[1]);
                         } else{

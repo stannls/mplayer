@@ -135,7 +135,16 @@ pub fn build_record_focus(
     record: Box<dyn Album>,
     index: Option<usize>,
     displayable_results: usize,
+    current_song: &Option<SongInfo>,
 ) -> Table<'static> {
+    let playing = if current_song.is_some() {
+        record
+            .get_songs()
+            .iter()
+            .position(|x| x.get_title() == current_song.to_owned().unwrap().name)
+    } else {
+        None
+    };
     let rows: Vec<Vec<String>> = record
         .get_songs()
         .into_iter()
@@ -150,6 +159,7 @@ pub fn build_record_focus(
 
     ScrollTable::new(rows)
         .focus(index)
+        .selected(playing)
         .displayable_results(displayable_results)
         .render()
         .header(Row::new(vec!["#", "Title", "Length"]))
