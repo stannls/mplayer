@@ -6,7 +6,7 @@ use tui::{
     style::{Color, Modifier, Style},
     text::Span,
     text::Spans,
-    widgets::{Block, Borders, Gauge, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table},
 };
 
 pub enum ToolbarType {
@@ -36,9 +36,36 @@ pub fn build_side_menu(
 }
 
 // The welcome window
-pub fn build_welcome_window() -> Paragraph<'static> {
-    Paragraph::new("Lorem ipsum dolor sit amet.")
-        .block(Block::default().borders(Borders::ALL).title("Welcome"))
+pub fn build_help_window() -> Table<'static> {
+    Table::new(vec![
+        Row::new(vec![
+            Cell::from("Global").style(Style::default().add_modifier(Modifier::BOLD))
+        ]),
+        Row::new(vec!["L", "Libary"]),
+        Row::new(vec!["s", "Search"]),
+        Row::new(vec!["h", "Help"]),
+        Row::new(vec!["↑", "Up"]),
+        Row::new(vec!["↓", "Down"]),
+        Row::new(vec!["<enter>", "Select"]),
+        Row::new(vec!["<space>", "Pause/Continue"]),
+        Row::new(vec!["v", "Stop"]),
+        Row::new(vec!["n", "Skip"]),
+        Row::new(vec![
+            Cell::from("Search").style(Style::default().add_modifier(Modifier::BOLD))
+        ]),
+        Row::new(vec!["S", "Select song"]),
+        Row::new(vec!["R", "Select record"]),
+        Row::new(vec!["A", "Select artist"]),
+        Row::new(vec!["P", "Select playlist"]),
+        Row::new(vec![
+            Cell::from("Media-View").style(Style::default().add_modifier(Modifier::BOLD))
+        ]),
+        Row::new(vec!["d", "Download media"]),
+        Row::new(vec!["p", "Play media"]),
+        Row::new(vec!["e", "Enqueue media"]),
+    ])
+    .widths(&[Constraint::Percentage(20), Constraint::Percentage(80)])
+    .block(Block::default().borders(Borders::ALL).title("Help"))
 }
 
 // The searchbar

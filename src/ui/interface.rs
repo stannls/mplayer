@@ -34,7 +34,7 @@ pub(crate) struct UiState {
 
 #[derive(Clone)]
 pub(crate) enum MainWindowState {
-    Welcome,
+    Help,
     Results((Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)),
     SongFocus(Box<dyn Song>),
     ArtistFocus(Box<dyn Artist>, Option<usize>),
@@ -57,7 +57,7 @@ impl UiState {
             searching: false,
             searchbar_content: String::from(""),
             quit: false,
-            main_window_state: MainWindowState::Welcome,
+            main_window_state: MainWindowState::Help,
             focused_result: FocusedResult::None,
             last_search: None,
             artists: vec![],
@@ -127,8 +127,8 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                 // The main content window
                 match ui_state.main_window_state.to_owned() {
                     // The default welcome screen
-                    MainWindowState::Welcome => {
-                        f.render_widget(components::build_welcome_window(), content_layout[1])
+                    MainWindowState::Help => {
+                        f.render_widget(components::build_help_window(), content_layout[1])
                     }
                     // The window for viewing details to a song
                     MainWindowState::SongFocus(s) => {
