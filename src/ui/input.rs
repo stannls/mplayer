@@ -191,8 +191,20 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                         }
                         _ => {}
                     },
-                    MainWindowState::ArtistFocus(a, index) => if !matches!(ui_state.focused_result, FocusedResult::Libary(_)) && index.is_some() && index.unwrap() > 0 {ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(index.unwrap()-1))},
-                    MainWindowState::RecordFocus(r, index) => if !matches!(ui_state.focused_result, FocusedResult::Libary(_)) && index.is_some() && index.unwrap() > 0 {ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(index.unwrap()-1))},
+                    MainWindowState::ArtistFocus(a, index) => if !matches!(ui_state.focused_result, FocusedResult::Libary(_)) && index.is_some() {
+                        if index.unwrap() > 0 {
+                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(index.unwrap()-1))
+                        } else {
+                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, None)
+                        }
+                    },
+                    MainWindowState::RecordFocus(r, index) => if !matches!(ui_state.focused_result, FocusedResult::Libary(_)) && index.is_some() {
+                        if index.unwrap() > 0 {
+                            ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(index.unwrap()-1))
+                        } else {
+                            ui_state.main_window_state = MainWindowState::RecordFocus(r, None)
+                        }
+                    },
                     _ => {}
 
                 };
