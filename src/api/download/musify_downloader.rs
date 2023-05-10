@@ -45,7 +45,11 @@ impl MusifyDownloader {
             .into_iter()
             .filter(|f| f.category == "Треки")
             .collect::<Vec<SearchResult>>();
-        Ok(songs.get(0).unwrap().url.to_owned())
+        if songs.len() > 0 {
+            Ok(songs.get(0).unwrap().url.to_owned())
+        } else {
+            Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "No page link found.")))
+        }
     }
 
     fn parse_page_link(page_link: String) ->  Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
