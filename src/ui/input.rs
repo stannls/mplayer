@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::{Duration, Instant};
-use crate::api::fs::FsArtist;
+use crate::api::fs::{FsArtist, find_current_album};
 use crate::api::player::MusicPlayer;
 use crate::api::search::remote::{unique_releases, album_from_release_group_id};
 use crate::api::search::wrapper::AlbumWrapper;
@@ -76,6 +76,15 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
             KeyCode::Char('+') => music_player.change_volume(0.1),
             KeyCode::Char('-') => music_player.change_volume(-0.1),
             KeyCode::Char('h') => ui_state.main_window_state = MainWindowState::Help,
+            KeyCode::Char('c') => {
+                let song_info = music_player.get_song_info();
+                if song_info.is_some() {
+                    let current_album = find_current_album(&song_info.unwrap());
+                    if current_album.is_some() {
+                        ui_state.main_window_state = MainWindowState::RecordFocus(current_album.unwrap(), None);
+                    }
+                }
+            }
             KeyCode::Char('s') => {
                 ui_state.searching = true;
                 ui_state.focused_result = FocusedResult::None;

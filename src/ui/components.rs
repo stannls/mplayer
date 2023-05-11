@@ -50,6 +50,7 @@ pub fn build_help_window() -> Table<'static> {
         Row::new(vec!["<space>", "Pause/Continue"]),
         Row::new(vec!["v", "Stop"]),
         Row::new(vec!["n", "Skip"]),
+        Row::new(vec!["c", "Current album"]),
         Row::new(vec![
             Cell::from("Search").style(Style::default().add_modifier(Modifier::BOLD))
         ]),

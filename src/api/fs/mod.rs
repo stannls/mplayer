@@ -1,5 +1,9 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs::{self, DirEntry},
+    path::PathBuf,
+};
 
+use crate::api::player::SongInfo;
 use audiotags::Tag;
 use chrono::Duration;
 use dirs::audio_dir;
@@ -175,4 +179,26 @@ impl Song for FsSong {
     fn get_album_name(&self) -> String {
         self.album_name.to_owned()
     }
+}
+
+// Tries to find the album of the given song in the local files
+pub fn find_current_album(song_info: &SongInfo) -> Option<Box<dyn Album>> {
+    let mut dir = audio_dir().unwrap();
+    dir.push("mplayer");
+    let artists = fs::read_dir(dir.clone())
+        .unwrap()
+        .into_iter()
+        .filter(|f| f.is_ok())
+        .map(|f| f.unwrap())
+        .filter(|f| f.file_name().into_string().unwrap() == song_info.artist)
+        .collect::<Vec<DirEntry>>();
+    dir.push(artists.get(0)?.file_name());
+    let albums = fs::read_dir(dir.clone())
+        .unwrap()
+        .into_iter()
+        .filter(|f| f.is_ok())
+        .map(|f| f.unwrap())
+        .filter(|f| f.file_name().into_string().unwrap() == song_info.album)
+        .collect::<Vec<DirEntry>>();
+    Some(Box::new(FsAlbum::new(albums.get(0)?.path())?))
 }
