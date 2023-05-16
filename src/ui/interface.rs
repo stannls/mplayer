@@ -30,6 +30,8 @@ pub(crate) struct UiState {
     pub(crate) focused_result: FocusedResult,
     pub(crate) last_search: Option<(Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)>,
     pub(crate) artists: Vec<String>,
+    pub(crate) sideMenu: SideMenu,
+    pub(crate) focus: Focus,
 }
 
 #[derive(Clone)]
@@ -48,7 +50,20 @@ pub(crate) enum FocusedResult {
     Record(usize),
     Artist(usize),
     Playlist(usize),
-    Libary(usize),
+}
+
+#[derive(Clone)]
+pub(crate) enum SideMenu {
+    Libary(Option<usize>),
+    Queue(Option<usize>),
+    None
+}
+
+#[derive(Clone)]
+pub enum Focus {
+    MainWindow,
+    SideWindow,
+    None,
 }
 
 impl UiState {
@@ -61,6 +76,8 @@ impl UiState {
             focused_result: FocusedResult::None,
             last_search: None,
             artists: vec![],
+            sideMenu: SideMenu::Libary(None),
+            focus: Focus::None
         }
     }
 }
@@ -118,11 +135,11 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                 f.render_widget(components::build_searchbar(search), main_layout[0]);
 
                 // Side menu
-                let index = match ui_state.focused_result {
-                    FocusedResult::Libary(i) => Some(i),
-                    _ => None,
-                };
-                f.render_widget(components::build_side_menu(ui_state.artists.to_owned(), index, content_layout[0].height as usize - 3), content_layout[0]);
+                match ui_state.sideMenu {
+                    SideMenu::Libary(i) => f.render_widget(components::build_libary(ui_state.artists.to_owned(), i, content_layout[0].height as usize - 3), content_layout[0]),
+                    SideMenu::Queue(i) => f.render_widget(components::build_queue(music_player.get_queue(), i, content_layout[0].height as usize - 3), content_layout[0]),
+                    SideMenu::None => {},
+                }
 
                 // The main content window
                 match ui_state.main_window_state.to_owned() {

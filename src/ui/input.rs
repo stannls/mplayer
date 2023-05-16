@@ -1,14 +1,14 @@
 use crossterm::event::{self, KeyEvent, KeyCode};
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use std::thread;
+use std::{thread, println};
 use std::time::{Duration, Instant};
 use crate::api::fs::{FsArtist, find_current_album};
 use crate::api::player::MusicPlayer;
 use crate::api::search::remote::{unique_releases, album_from_release_group_id};
 use crate::api::search::wrapper::AlbumWrapper;
 use crate::ui::helpers;
-use super::interface::{UiState, MainWindowState, FocusedResult};
+use super::interface::{UiState, MainWindowState, FocusedResult, SideMenu, Focus};
 use crate::api::download::download_pool::DownloadPool;
 
 
@@ -75,7 +75,10 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
             KeyCode::Char('q') => ui_state.quit = true,
             KeyCode::Char('+') => music_player.change_volume(0.1),
             KeyCode::Char('-') => music_player.change_volume(-0.1),
-            KeyCode::Char('h') => ui_state.main_window_state = MainWindowState::Help,
+            KeyCode::Char('h') => {
+                ui_state.main_window_state = MainWindowState::Help;
+                ui_state.focus = Focus::None
+            },
             KeyCode::Char('c') => {
                 let song_info = music_player.get_song_info();
                 if song_info.is_some() {
@@ -118,113 +121,132 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                     }
             },
             KeyCode::Char('L') => {
-                if !matches!(ui_state.focused_result, FocusedResult::Libary(_)) {
-                    ui_state.focused_result = FocusedResult::Libary(0);
+                if !matches!(ui_state.sideMenu, SideMenu::Libary(_)) {
+                    ui_state.sideMenu = SideMenu::Libary(None);
+                    ui_state.focus = Focus::SideWindow;
                     match ui_state.main_window_state.to_owned() {
                         MainWindowState::RecordFocus(r, _) => ui_state.main_window_state = MainWindowState::RecordFocus(r, None),
                         MainWindowState::ArtistFocus(a, _) => ui_state.main_window_state = MainWindowState::ArtistFocus(a, None),
                         _ => {}
                     }
+                } else {
+                    ui_state.focus = Focus::SideWindow;
+                }
+            },
+            KeyCode::Char('Q') => {
+                if !matches!(ui_state.sideMenu, SideMenu::Queue(_)) {
+                    ui_state.sideMenu = SideMenu::Queue(None);
+                    ui_state.focus = Focus::SideWindow;
+                    match ui_state.main_window_state.to_owned() {
+                        MainWindowState::RecordFocus(r, _) => ui_state.main_window_state = MainWindowState::RecordFocus(r, None),
+                        MainWindowState::ArtistFocus(a, _) => ui_state.main_window_state = MainWindowState::ArtistFocus(a, None),
+                        _ => {}
+                    }
+
+                } else {
+                    ui_state.focus = Focus::SideWindow;
                 }
             }
             KeyCode::Down => {
-                match ui_state.focused_result {
-                    FocusedResult::Libary(index) => {
-                        if ui_state.artists.len() - index > 1{
-                            ui_state.focused_result = FocusedResult::Libary(index+1);
+                match ui_state.focus {
+                    Focus::MainWindow => {
+                        match ui_state.main_window_state.clone() {
+                            MainWindowState::Results(_) => {
+                                match ui_state.focused_result {
+                                    FocusedResult::Song(i) => if helpers::check_scroll_space_down(ui_state) {
+                                        ui_state.focused_result = FocusedResult::Song(i+1)
+                                    },
+                                    FocusedResult::Record(i) => if helpers::check_scroll_space_down(ui_state) {
+                                        ui_state.focused_result = FocusedResult::Record(i+1)
+                                    },
+                                    FocusedResult::Artist(i) => if helpers::check_scroll_space_down(ui_state) {
+                                        ui_state.focused_result = FocusedResult::Artist(i+1)
+                                    },
+                                    _ => {}
+                                }
+                            },
+                            MainWindowState::ArtistFocus(a, i) => if a.get_albums().len() - i.unwrap_or(0) > 0 {
+                                if i.is_some() {
+                                    ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(i.unwrap()+1))
+                                } else {
+                                    ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(0))
+                                }
+                            },
+                            MainWindowState::RecordFocus(r, i) => if r.get_songs().len() - i.unwrap_or(0) > 0 {
+                                if i.is_some() {
+                                    ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(i.unwrap()+1))
+                                } else {
+                                    ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(0))
+                                }
+                            },
+                            _ => {},
                         }
                     },
-                    _ => {}
+                    Focus::SideWindow => {
+                        match ui_state.sideMenu {
+                            SideMenu::Libary(i) => if ui_state.artists.len() - i.unwrap_or(0) > 0 {
+                                if i.is_some() {
+                                    ui_state.sideMenu = SideMenu::Libary(Some(i.unwrap()+1))
+                                } else {
+                                    ui_state.sideMenu = SideMenu::Libary(Some(0))
+                                }
+                            },
+                            SideMenu::Queue(_) => {},
+                            SideMenu::None => {},
+                        }
+                    },
+                    Focus::None => {}
                 }
-                match ui_state.main_window_state.clone(){
-                    MainWindowState::Results(_) => match ui_state.focused_result {
-                        FocusedResult::Song(t) => {
-                            if helpers::check_scroll_space_down(ui_state) {
-                                ui_state.focused_result = FocusedResult::Song(t + 1)
-                            }
-                        }
-                        FocusedResult::Record(t) => {
-                            if helpers::check_scroll_space_down(ui_state) {
-                                ui_state.focused_result = FocusedResult::Record(t + 1)
-                            }
-                        }
-                        FocusedResult::Artist(t) => {
-                            if helpers::check_scroll_space_down(ui_state) {
-                                ui_state.focused_result = FocusedResult::Artist(t + 1)
-                            }
-                        },
-                        _ => {}
-
-                    },
-                    MainWindowState::ArtistFocus(a, index) => {
-                        if !matches!(ui_state.focused_result, FocusedResult::Libary(_)){
-                            if index.is_none() {
-                                ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(0));
-                            } else if a.get_albums().len() - index.unwrap() > 1 {
-                                ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(index.unwrap()+1));
-                            }
-
-                        }
-                    },
-                    MainWindowState::RecordFocus(r, index) => {
-
-                        if !matches!(ui_state.focused_result, FocusedResult::Libary(_)){
-                            if index.is_none() {
-                                ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(0));
-                            } else if r.get_songs().len() - index.unwrap() > 1 {
-                                ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(index.unwrap()+1));
-                            }
-                        }
-
-                    },
-                    _ => {}
-
-                };
             },
             KeyCode::Up => {
-                match ui_state.main_window_state.clone(){
-                    MainWindowState::Results(_) => match ui_state.focused_result {
-                        FocusedResult::Song(t) => {
-                            if t > 0 {
-                                ui_state.focused_result = FocusedResult::Song(t - 1)
-                            }
-                        }
-                        FocusedResult::Record(t) => {
-                            if t > 0 {
-                                ui_state.focused_result = FocusedResult::Record(t - 1)
-                            }
-                        }
-                        FocusedResult::Artist(t) => {
-                            if t > 0 {
-                                ui_state.focused_result = FocusedResult::Artist(t - 1)
-                            }
-                        }
-                        _ => {}
-                    },
-                    MainWindowState::ArtistFocus(a, index) => if !matches!(ui_state.focused_result, FocusedResult::Libary(_)) && index.is_some() {
-                        if index.unwrap() > 0 {
-                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(index.unwrap()-1))
-                        } else {
-                            ui_state.main_window_state = MainWindowState::ArtistFocus(a, None)
-                        }
-                    },
-                    MainWindowState::RecordFocus(r, index) => if !matches!(ui_state.focused_result, FocusedResult::Libary(_)) && index.is_some() {
-                        if index.unwrap() > 0 {
-                            ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(index.unwrap()-1))
-                        } else {
-                            ui_state.main_window_state = MainWindowState::RecordFocus(r, None)
-                        }
-                    },
-                    _ => {}
-
-                };
-                match ui_state.focused_result{
-                    FocusedResult::Libary(index) => {
-                        if index > 0 {
-                            ui_state.focused_result = FocusedResult::Libary(index-1);
+                match ui_state.focus {
+                    Focus::MainWindow => {
+                        match ui_state.main_window_state.clone() {
+                            MainWindowState::Results(_) => {
+                                match ui_state.focused_result {
+                                    FocusedResult::Song(i) => if i > 0 {
+                                        ui_state.focused_result = FocusedResult::Song(i-1)
+                                    },
+                                    FocusedResult::Record(i) => if i > 0 {
+                                        ui_state.focused_result = FocusedResult::Record(i-1)
+                                    },
+                                    FocusedResult::Artist(i) => if i > 0 {
+                                        ui_state.focused_result = FocusedResult::Artist(i-1)
+                                    },
+                                    _ => {},
+                                }
+                            },
+                            MainWindowState::ArtistFocus(a, i) => if i.is_some() {
+                                if i.unwrap() > 0 {
+                                    ui_state.main_window_state = MainWindowState::ArtistFocus(a, Some(i.unwrap()-1))
+                                } else {
+                                    ui_state.main_window_state = MainWindowState::ArtistFocus(a, None)
+                                }
+                            },
+                            MainWindowState::RecordFocus(r, i) => if i.is_some() {
+                                if i.unwrap() > 0 {
+                                    ui_state.main_window_state = MainWindowState::RecordFocus(r, Some(i.unwrap()-1))
+                                } else {
+                                    ui_state.main_window_state = MainWindowState::RecordFocus(r, None)
+                                }
+                            },
+                            _ => {},
                         }
                     },
-                    _ => {}
+                    Focus::SideWindow => {
+                        match ui_state.sideMenu {
+                            SideMenu::Libary(i) => if i.is_some() {
+                                if i.unwrap() > 0 {
+                                    ui_state.sideMenu = SideMenu::Libary(Some(i.unwrap()-1))
+                                } else {
+                                    ui_state.sideMenu = SideMenu::Libary(None)
+                                }
+                            },
+                            SideMenu::Queue(_) => {},
+                            SideMenu::None => {},
+                        }
+                    },
+                    Focus::None => {}
                 }
             },
             KeyCode::Char('b') => match ui_state.main_window_state {
@@ -240,50 +262,46 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                 _ => {}
             },
             KeyCode::Enter => {
-                match ui_state.main_window_state.clone() {
-                    MainWindowState::Results(r) => match ui_state.focused_result {
-                        FocusedResult::Song(id) => {
-                            ui_state.focused_result = FocusedResult::None;
-                            ui_state.last_search = Some(r.clone());
-                            ui_state.main_window_state =
-                                MainWindowState::SongFocus(Box::new(r.2.get(id).unwrap().clone()));
+                match ui_state.focus {
+                    Focus::MainWindow => {
+                        match ui_state.main_window_state.clone() {
+                            MainWindowState::Results(r) => match ui_state.focused_result {
+                                FocusedResult::Song(i) => {
+                                    ui_state.main_window_state = MainWindowState::SongFocus(Box::new(r.2.get(i).unwrap().clone()))
+                                },
+                                FocusedResult::Record(i) => {
+                                    ui_state.main_window_state = MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(&r.0.get(i).unwrap().data.id).await)), None)
+                                },
+                                FocusedResult::Artist(i) => {
+                                    ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(r.1.get(i).unwrap().releases(unique_releases(r.1.get(i).unwrap().clone().data.id).await)), None)
+                                },
+                                _ => {}
+                            },
+                            MainWindowState::ArtistFocus(a, i) => if i.is_some() {
+                                if a.get_albums().get(i.unwrap()).unwrap().is_groups() {
+                                    ui_state.main_window_state = MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(&a.get_albums().get(i.unwrap()).unwrap().get_id()).await)), None)
+                                } else {
+                                    ui_state.main_window_state = MainWindowState::RecordFocus(a.get_albums().get(i.unwrap()).unwrap().to_owned(), None)
+                                }
+                            },
+                            MainWindowState::RecordFocus(r, i) => if i.is_some() {
+                                ui_state.main_window_state = MainWindowState::SongFocus(r.get_songs().get(i.unwrap()).unwrap().to_owned())
+                            },
+                            _ => {},
                         }
-                        FocusedResult::Record(id) => {
-                            ui_state.focused_result = FocusedResult::None;
-                            ui_state.last_search = Some(r.clone());
-                            ui_state.main_window_state = {
-                                MainWindowState::RecordFocus(
-                                    Box::new(AlbumWrapper::new(album_from_release_group_id(&r.0.get(id).unwrap().data.id).await)), None)
-                            }
+                    },
+                    Focus::SideWindow => {
+                        match ui_state.sideMenu {
+                            SideMenu::Libary(i) => if i.is_some() {
+                                ui_state.focus = Focus::MainWindow;
+                                ui_state.sideMenu = SideMenu::Libary(None);
+                                ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(FsArtist::new(ui_state.artists.get(i.unwrap()).unwrap().to_owned()).unwrap()), None)
+                            },
+                            SideMenu::Queue(_) => {},
+                            SideMenu::None => {},
                         }
-                        FocusedResult::Artist(id) => {
-                            ui_state.focused_result = FocusedResult::None;
-                            ui_state.last_search = Some(r.clone());
-                            let albums = unique_releases(r.1.get(id).unwrap().clone().data.id).await;
-                            ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(r.1.get(id).unwrap().releases(albums)), None);
-                        }
-                        _ => {}
                     },
-                    MainWindowState::ArtistFocus(a, index) => if index.is_some() {
-                        ui_state.main_window_state =
-                            if a.get_albums().get(index.unwrap()).unwrap().is_groups() {
-                                MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(&a.get_albums().get(index.unwrap()).unwrap().get_id()).await)), None)
-                            } else {
-                                MainWindowState::RecordFocus(a.get_albums().get(index.unwrap()).unwrap().to_owned(), None)};
-
-                    },
-                    MainWindowState::RecordFocus(r, index) => if index.is_some() {
-                        ui_state.main_window_state = MainWindowState::SongFocus(r.get_songs().get(index.unwrap()).unwrap().to_owned());
-                    }
-
-                    _ => {}
-                };
-                match ui_state.focused_result {
-                    FocusedResult::Libary(index) => {
-                        ui_state.focused_result = FocusedResult::None;
-                        ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(FsArtist::new(ui_state.artists.get(index).unwrap().to_owned()).unwrap()), None);
-                    },
-                    _ => {}
+                    Focus::None => {}
                 }
             },
             _ => {}
@@ -301,7 +319,10 @@ async fn handle_search_input(input: KeyEvent, ui_state: &mut UiState) {
             ui_state.searching = false;
             ui_state.searchbar_content.clear();
         }
-        KeyCode::Enter => helpers::query_web(ui_state).await,
+        KeyCode::Enter => {
+            ui_state.focus = Focus::MainWindow;
+            helpers::query_web(ui_state).await
+        },
         _ => {}
     }
 

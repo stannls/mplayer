@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use super::scroll_components::ScrollTable;
 use crate::api::{player::SongInfo, search::wrapper, Album, Artist, Song};
 
@@ -21,7 +23,7 @@ pub fn build_window_border() -> Block<'static> {
 }
 
 // The menu on the left side
-pub fn build_side_menu(
+pub fn build_libary(
     content: Vec<String>,
     index: Option<usize>,
     displayable_results: usize,
@@ -235,4 +237,17 @@ pub fn build_progress_bar(song_info: &SongInfo) -> Gauge<'static> {
             (song_info.length / 60) % 60,
             song_info.length % 60
         ))
+}
+
+pub fn build_queue(
+    q: VecDeque<SongInfo>,
+    index: Option<usize>,
+    displayable_results: usize,
+) -> Table<'static> {
+    ScrollTable::new(q.into_iter().map(|f| vec![f.name]).collect())
+        .focus(index)
+        .displayable_results(displayable_results)
+        .render()
+        .block(Block::default().borders(Borders::all()).title("[Q]ueue"))
+        .widths(&[Constraint::Percentage(100)])
 }

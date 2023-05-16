@@ -81,23 +81,30 @@ pub struct MusicPlayer {
     // sink will be unable to play
     sender: Sender<MusicPlayerEvent>,
     current_song: Arc<Mutex<Option<SongInfo>>>,
+    queue: Arc<Mutex<VecDeque<SongInfo>>>,
 }
 
 impl MusicPlayer {
     pub fn new<'a>() -> MusicPlayer {
         let (tx, rx) = mpsc::channel::<MusicPlayerEvent>();
         let played_song = Arc::new(Mutex::new(None));
-        MusicPlayer::start(rx, played_song.to_owned());
+        let queue = Arc::new(Mutex::new(VecDeque::new()));
+        MusicPlayer::start(rx, played_song.to_owned(), queue.to_owned());
         MusicPlayer {
             sender: tx,
             current_song: played_song,
+            queue,
         }
     }
-    fn start(rx: Receiver<MusicPlayerEvent>, current_song: Arc<Mutex<Option<SongInfo>>>) {
+    fn start(
+        rx: Receiver<MusicPlayerEvent>,
+        current_song: Arc<Mutex<Option<SongInfo>>>,
+        queue: Arc<Mutex<VecDeque<SongInfo>>>,
+    ) {
         thread::spawn(move || {
             let (_stream, stream_handle) = OutputStream::try_default().unwrap();
             let sink = Sink::try_new(&stream_handle).unwrap();
-            let mut queue = VecDeque::new();
+            let mut internal_queue = VecDeque::new();
             loop {
                 match rx.try_recv().unwrap_or(MusicPlayerEvent::None) {
                     MusicPlayerEvent::Play(source) => {
@@ -107,22 +114,24 @@ impl MusicPlayer {
                             let mut guard = current_song.lock().unwrap();
                             *guard = Some(source.1.set_start(Instant::now()));
                         } else {
-                            queue.push_back(source)
+                            queue.lock().unwrap().push_back(source.1.to_owned());
+                            internal_queue.push_back(source);
                         }
                     }
                     MusicPlayerEvent::Stop => {
                         sink.stop();
-                        queue.clear();
+                        internal_queue.clear();
                         let mut guard = current_song.lock().unwrap();
                         *guard = None;
                     }
                     MusicPlayerEvent::Skip => {
-                        if !sink.empty() && !queue.is_empty() {
+                        if !sink.empty() && !internal_queue.is_empty() {
                             sink.stop();
-                            let song = queue.pop_front().unwrap();
+                            let song = internal_queue.pop_front().unwrap();
                             sink.append(song.0);
                             let mut guard = current_song.lock().unwrap();
                             *guard = Some(song.1.set_start(Instant::now()));
+                            queue.lock().unwrap().pop_front();
                         }
                     }
                     MusicPlayerEvent::Pause => {
@@ -148,11 +157,12 @@ impl MusicPlayer {
                     MusicPlayerEvent::None => {}
                 }
                 // Event for playing a new song after the last is finished
-                if !queue.is_empty() && sink.empty() {
-                    let song = queue.pop_front().unwrap();
+                if !internal_queue.is_empty() && sink.empty() {
+                    let song = internal_queue.pop_front().unwrap();
                     sink.append(song.0);
                     let mut guard = current_song.lock().unwrap();
                     *guard = Some(song.1.set_start(Instant::now()));
+                    queue.lock().unwrap().pop_front();
                 } else if sink.empty() && current_song.lock().unwrap().is_some() {
                     let mut guard = current_song.lock().unwrap();
                     *guard = None;
@@ -220,5 +230,8 @@ impl MusicPlayer {
         self.sender
             .send(MusicPlayerEvent::Volume(modifier))
             .unwrap();
+    }
+    pub fn get_queue(&self) -> VecDeque<SongInfo> {
+        self.queue.lock().unwrap().deref().to_owned()
     }
 }
