@@ -14,6 +14,7 @@ use crossterm::event::{DisableMouseCapture, KeyEvent};
 use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen};
+use std::collections::VecDeque;
 use std::io;
 use std::{io::Stdout, sync::mpsc::Receiver};
 use tui::{backend::CrosstermBackend, Terminal};
@@ -28,7 +29,7 @@ pub(crate) struct UiState {
     pub(crate) quit: bool,
     pub(crate) main_window_state: MainWindowState,
     pub(crate) focused_result: FocusedResult,
-    pub(crate) last_search: Option<(Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)>,
+    pub(crate) history: VecDeque<MainWindowState>,
     pub(crate) artists: Vec<String>,
     pub(crate) sideMenu: SideMenu,
     pub(crate) focus: Focus,
@@ -74,7 +75,7 @@ impl UiState {
             quit: false,
             main_window_state: MainWindowState::Help,
             focused_result: FocusedResult::None,
-            last_search: None,
+            history: VecDeque::new(),
             artists: vec![],
             sideMenu: SideMenu::Libary(None),
             focus: Focus::None

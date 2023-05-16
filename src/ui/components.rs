@@ -44,6 +44,7 @@ pub fn build_help_window() -> Table<'static> {
             Cell::from("Global").style(Style::default().add_modifier(Modifier::BOLD))
         ]),
         Row::new(vec!["L", "Libary"]),
+        Row::new(vec!["Q", "Queue"]),
         Row::new(vec!["s", "Search"]),
         Row::new(vec!["h", "Help"]),
         Row::new(vec!["↑", "Up"]),
@@ -53,6 +54,7 @@ pub fn build_help_window() -> Table<'static> {
         Row::new(vec!["v", "Stop"]),
         Row::new(vec!["n", "Skip"]),
         Row::new(vec!["c", "Current album"]),
+        Row::new(vec!["b", "Back"]),
         Row::new(vec![
             Cell::from("Search").style(Style::default().add_modifier(Modifier::BOLD))
         ]),

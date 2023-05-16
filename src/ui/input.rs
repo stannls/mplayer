@@ -249,17 +249,8 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                     Focus::None => {}
                 }
             },
-            KeyCode::Char('b') => match ui_state.main_window_state {
-                MainWindowState::SongFocus(_)
-                    | MainWindowState::ArtistFocus(_, _)
-                    | MainWindowState::RecordFocus(_, _) => {
-                        if matches!(ui_state.last_search, Some(_)) {
-                            ui_state.main_window_state =
-                                MainWindowState::Results(ui_state.last_search.clone().unwrap());
-                            ui_state.last_search = None;
-                        }
-                    }
-                _ => {}
+            KeyCode::Char('b') => if matches!(ui_state.focus, Focus::MainWindow) && ui_state.history.len() > 0 {
+                ui_state.main_window_state = ui_state.history.pop_front().unwrap();
             },
             KeyCode::Enter => {
                 match ui_state.focus {
@@ -267,17 +258,21 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                         match ui_state.main_window_state.clone() {
                             MainWindowState::Results(r) => match ui_state.focused_result {
                                 FocusedResult::Song(i) => {
+                                    ui_state.history.push_front(ui_state.main_window_state.to_owned());
                                     ui_state.main_window_state = MainWindowState::SongFocus(Box::new(r.2.get(i).unwrap().clone()))
                                 },
                                 FocusedResult::Record(i) => {
+                                    ui_state.history.push_front(ui_state.main_window_state.to_owned());
                                     ui_state.main_window_state = MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(&r.0.get(i).unwrap().data.id).await)), None)
                                 },
                                 FocusedResult::Artist(i) => {
+                                    ui_state.history.push_front(ui_state.main_window_state.to_owned());
                                     ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(r.1.get(i).unwrap().releases(unique_releases(r.1.get(i).unwrap().clone().data.id).await)), None)
                                 },
                                 _ => {}
                             },
                             MainWindowState::ArtistFocus(a, i) => if i.is_some() {
+                                ui_state.history.push_front(ui_state.main_window_state.to_owned());
                                 if a.get_albums().get(i.unwrap()).unwrap().is_groups() {
                                     ui_state.main_window_state = MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(&a.get_albums().get(i.unwrap()).unwrap().get_id()).await)), None)
                                 } else {
@@ -285,6 +280,7 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                                 }
                             },
                             MainWindowState::RecordFocus(r, i) => if i.is_some() {
+                                ui_state.history.push_front(ui_state.main_window_state.to_owned());
                                 ui_state.main_window_state = MainWindowState::SongFocus(r.get_songs().get(i.unwrap()).unwrap().to_owned())
                             },
                             _ => {},
@@ -293,6 +289,7 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                     Focus::SideWindow => {
                         match ui_state.sideMenu {
                             SideMenu::Libary(i) => if i.is_some() {
+                                ui_state.history.push_front(ui_state.main_window_state.to_owned());
                                 ui_state.focus = Focus::MainWindow;
                                 ui_state.sideMenu = SideMenu::Libary(None);
                                 ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(FsArtist::new(ui_state.artists.get(i.unwrap()).unwrap().to_owned()).unwrap()), None)
