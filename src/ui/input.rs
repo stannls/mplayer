@@ -1,7 +1,7 @@
 use crossterm::event::{self, KeyEvent, KeyCode};
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use std::{thread, println};
+use std::thread;
 use std::time::{Duration, Instant};
 use crate::api::fs::{FsArtist, find_current_album};
 use crate::api::player::MusicPlayer;
@@ -121,8 +121,8 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                     }
             },
             KeyCode::Char('L') => {
-                if !matches!(ui_state.sideMenu, SideMenu::Libary(_)) {
-                    ui_state.sideMenu = SideMenu::Libary(None);
+                if !matches!(ui_state.side_menu, SideMenu::Libary(_)) {
+                    ui_state.side_menu = SideMenu::Libary(None);
                     ui_state.focus = Focus::SideWindow;
                     match ui_state.main_window_state.to_owned() {
                         MainWindowState::RecordFocus(r, _) => ui_state.main_window_state = MainWindowState::RecordFocus(r, None),
@@ -134,8 +134,8 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                 }
             },
             KeyCode::Char('Q') => {
-                if !matches!(ui_state.sideMenu, SideMenu::Queue(_)) {
-                    ui_state.sideMenu = SideMenu::Queue(None);
+                if !matches!(ui_state.side_menu, SideMenu::Queue(_)) {
+                    ui_state.side_menu = SideMenu::Queue(None);
                     ui_state.focus = Focus::SideWindow;
                     match ui_state.main_window_state.to_owned() {
                         MainWindowState::RecordFocus(r, _) => ui_state.main_window_state = MainWindowState::RecordFocus(r, None),
@@ -183,12 +183,12 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                         }
                     },
                     Focus::SideWindow => {
-                        match ui_state.sideMenu {
+                        match ui_state.side_menu {
                             SideMenu::Libary(i) => if ui_state.artists.len() - i.unwrap_or(0) > 0 {
                                 if i.is_some() {
-                                    ui_state.sideMenu = SideMenu::Libary(Some(i.unwrap()+1))
+                                    ui_state.side_menu = SideMenu::Libary(Some(i.unwrap()+1))
                                 } else {
-                                    ui_state.sideMenu = SideMenu::Libary(Some(0))
+                                    ui_state.side_menu = SideMenu::Libary(Some(0))
                                 }
                             },
                             SideMenu::Queue(_) => {},
@@ -234,12 +234,12 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                         }
                     },
                     Focus::SideWindow => {
-                        match ui_state.sideMenu {
+                        match ui_state.side_menu {
                             SideMenu::Libary(i) => if i.is_some() {
                                 if i.unwrap() > 0 {
-                                    ui_state.sideMenu = SideMenu::Libary(Some(i.unwrap()-1))
+                                    ui_state.side_menu = SideMenu::Libary(Some(i.unwrap()-1))
                                 } else {
-                                    ui_state.sideMenu = SideMenu::Libary(None)
+                                    ui_state.side_menu = SideMenu::Libary(None)
                                 }
                             },
                             SideMenu::Queue(_) => {},
@@ -287,11 +287,11 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                         }
                     },
                     Focus::SideWindow => {
-                        match ui_state.sideMenu {
+                        match ui_state.side_menu {
                             SideMenu::Libary(i) => if i.is_some() {
                                 ui_state.history.push_front(ui_state.main_window_state.to_owned());
                                 ui_state.focus = Focus::MainWindow;
-                                ui_state.sideMenu = SideMenu::Libary(None);
+                                ui_state.side_menu = SideMenu::Libary(None);
                                 ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(FsArtist::new(ui_state.artists.get(i.unwrap()).unwrap().to_owned()).unwrap()), None)
                             },
                             SideMenu::Queue(_) => {},

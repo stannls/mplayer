@@ -31,7 +31,7 @@ pub(crate) struct UiState {
     pub(crate) focused_result: FocusedResult,
     pub(crate) history: VecDeque<MainWindowState>,
     pub(crate) artists: Vec<String>,
-    pub(crate) sideMenu: SideMenu,
+    pub(crate) side_menu: SideMenu,
     pub(crate) focus: Focus,
 }
 
@@ -54,6 +54,7 @@ pub(crate) enum FocusedResult {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub(crate) enum SideMenu {
     Libary(Option<usize>),
     Queue(Option<usize>),
@@ -77,7 +78,7 @@ impl UiState {
             focused_result: FocusedResult::None,
             history: VecDeque::new(),
             artists: vec![],
-            sideMenu: SideMenu::Libary(None),
+            side_menu: SideMenu::Libary(None),
             focus: Focus::None
         }
     }
@@ -136,7 +137,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                 f.render_widget(components::build_searchbar(search), main_layout[0]);
 
                 // Side menu
-                match ui_state.sideMenu {
+                match ui_state.side_menu {
                     SideMenu::Libary(i) => f.render_widget(components::build_libary(ui_state.artists.to_owned(), i, content_layout[0].height as usize - 3), content_layout[0]),
                     SideMenu::Queue(i) => f.render_widget(components::build_queue(music_player.get_queue(), i, content_layout[0].height as usize - 3), content_layout[0]),
                     SideMenu::None => {},
