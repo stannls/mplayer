@@ -34,12 +34,19 @@ impl FsArtist {
         let mut path = audio_dir().unwrap();
         path.push("mplayer");
         path.push(name);
-
-        let albums = fs::read_dir(path.to_owned())
+        let mut albums: Vec<Box<dyn super::Album>> = fs::read_dir(path.to_owned())
             .unwrap()
             .into_iter()
             .map(|f| Box::new(FsAlbum::new(f.unwrap().path()).unwrap()) as Box<dyn Album>)
             .collect();
+        albums.sort_by(|a, b| {
+            a.get_release_date()
+                .parse::<usize>()
+                .unwrap_or(0)
+                .partial_cmp(&b.get_release_date().parse::<usize>().unwrap_or(0))
+                .unwrap()
+        });
+        albums.reverse();
         Some(FsArtist { path, albums })
     }
 }
@@ -86,7 +93,16 @@ impl Album for FsAlbum {
     }
 
     fn get_release_date(&self) -> String {
-        "".to_string()
+        self.songs
+            .to_owned()
+            .into_iter()
+            .map(|f| f.get_release_date())
+            .filter(|f| f.is_some())
+            .collect::<Vec<Option<String>>>()
+            .get(0)
+            .unwrap_or(&None)
+            .to_owned()
+            .unwrap_or("".to_string())
     }
 
     fn get_songs(&self) -> Vec<Box<dyn super::Song>> {
@@ -113,6 +129,7 @@ pub struct FsSong {
     length: f64,
     number: u16,
     album_name: String,
+    release_data: String,
 }
 
 impl FsSong {
@@ -126,6 +143,7 @@ impl FsSong {
                 .as_millis() as f64,
             number: tags.track_number().unwrap(),
             album_name: tags.album_title().unwrap_or("").to_string(),
+            release_data: tags.year().unwrap_or(0).to_string(),
         })
     }
 }
@@ -178,6 +196,14 @@ impl Song for FsSong {
 
     fn get_album_name(&self) -> String {
         self.album_name.to_owned()
+    }
+
+    fn get_release_date(&self) -> Option<String> {
+        if self.release_data == "0" {
+            None
+        } else {
+            Some(self.release_data.to_owned())
+        }
     }
 }
 

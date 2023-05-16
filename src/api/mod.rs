@@ -23,6 +23,7 @@ pub trait Song: DynClone + Send {
     fn is_local(&self) -> bool;
     fn get_filepath(&self) -> Option<PathBuf>;
     fn get_album_name(&self) -> String;
+    fn get_release_date(&self) -> Option<String>;
 }
 
 dyn_clone::clone_trait_object!(Song);

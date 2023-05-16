@@ -125,6 +125,10 @@ impl Song for SongWrapper {
         let t = Duration::milliseconds(self.data.length? as i64);
         Some(t.num_seconds() as usize)
     }
+
+    fn get_release_date(&self) -> Option<String> {
+        Some(self.data.releases.to_owned()?.get(0)?.date?.to_string())
+    }
 }
 
 #[derive(Clone)]
@@ -286,5 +290,9 @@ impl Song for TrackWrapper {
     fn get_length_secs(&self) -> Option<usize> {
         let t = Duration::milliseconds(self.data.length? as i64);
         Some(t.num_seconds() as usize)
+    }
+
+    fn get_release_date(&self) -> Option<String> {
+        None
     }
 }
