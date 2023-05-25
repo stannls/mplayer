@@ -6,10 +6,18 @@ pub mod bandcamp_downloader;
 use async_trait::async_trait;
 
 
-use super::Song;
+use super::{Song, Album};
 
 #[async_trait]
-pub trait AudioDownloader {
+pub trait SongDownloader {
     async fn download_song(&self, recording: Box<dyn Song>) ->  Result<String, Box<dyn std::error::Error + Send + Sync>>;
 }
 
+#[async_trait]
+pub trait AlbumDownloader {
+    async fn download_album(&self, album: Box<dyn Album + Send + Sync>) -> Vec<Result<String, Box<dyn std::error::Error + Send + Sync>>>;
+}
+
+pub trait Downloader: SongDownloader + AlbumDownloader {
+
+}

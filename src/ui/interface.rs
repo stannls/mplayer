@@ -41,7 +41,7 @@ pub(crate) enum MainWindowState {
     Results((Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)),
     SongFocus(Box<dyn Song>),
     ArtistFocus(Box<dyn Artist>, Option<usize>),
-    RecordFocus(Box<dyn Album>, Option<usize>),
+    RecordFocus(Box<dyn Album + Send + Sync>, Option<usize>),
 }
 
 #[derive(Clone)]

@@ -55,7 +55,7 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                     downloader.download_song(s)
                 },
                 MainWindowState::RecordFocus(r, _) => if !r.is_local(){
-                    downloader.download_songs(r.get_songs())
+                    downloader.download_album(r)
                 },
                 _ => {}
             },

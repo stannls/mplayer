@@ -1219,6 +1219,7 @@ dependencies = [
  "dirs",
  "dyn-clone",
  "gjson",
+ "markup5ever",
  "mp3-duration",
  "musicbrainz_rs",
  "ratatui",
@@ -1227,6 +1228,7 @@ dependencies = [
  "rodio",
  "scraper",
  "serde",
+ "string_cache",
  "threadpool",
  "tokio",
 ]
