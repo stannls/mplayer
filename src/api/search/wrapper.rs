@@ -37,11 +37,11 @@ impl Artist for ArtistWrapper {
     fn get_name(&self) -> String {
         self.data.name.to_owned()
     }
-    fn get_albums(&self) -> Vec<Box<dyn Album>> {
+    fn get_albums(&self) -> Vec<Box<dyn Album + Send + Sync>> {
         self.release_groups
             .to_owned()
             .into_iter()
-            .map(|f| Box::new(ReleaseGroupWrapper::new(f)) as Box<dyn Album>)
+            .map(|f| Box::new(ReleaseGroupWrapper::new(f)) as Box<dyn Album + Send + Sync>)
             .collect()
     }
 }
@@ -165,7 +165,7 @@ impl Album for ReleaseGroupWrapper {
     fn get_release_date(&self) -> String {
         self.data.first_release_date.unwrap().to_string()
     }
-    fn get_songs(&self) -> Vec<Box<dyn Song>> {
+    fn get_songs(&self) -> Vec<Box<dyn Song + Send + Sync>> {
         vec![]
     }
     fn is_groups(&self) -> bool {
@@ -198,18 +198,18 @@ impl Album for AlbumWrapper {
     fn get_release_date(&self) -> String {
         self.data.date.unwrap().to_string()
     }
-    fn get_songs(&self) -> Vec<Box<dyn Song>> {
+    fn get_songs(&self) -> Vec<Box<dyn Song + Send + Sync>> {
         let media = self.data.media.to_owned().unwrap();
         for m in media.clone() {
             if m.format.to_owned().unwrap() == "CD" {
-                let mut songs: Vec<Box<dyn Song>> = vec![];
+                let mut songs: Vec<Box<dyn Song + Send + Sync>> = vec![];
                 for s in media.get(0).unwrap().tracks.to_owned().unwrap() {
                     songs.push(Box::new(TrackWrapper::new(s, self.get_name())));
                 }
                 return songs;
             }
         }
-        let mut songs: Vec<Box<dyn Song>> = vec![];
+        let mut songs: Vec<Box<dyn Song + Send + Sync>> = vec![];
         for s in media.get(0).unwrap().tracks.to_owned().unwrap() {
             songs.push(Box::new(TrackWrapper::new(s, self.get_name())));
         }

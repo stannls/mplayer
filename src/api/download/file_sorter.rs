@@ -56,3 +56,5 @@ impl FileSorter {
         Ok(tags)
     }
 }
+unsafe impl Send for FileSorter {}
+unsafe impl Sync for FileSorter {}

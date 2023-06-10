@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use dyn_clone::DynClone;
 
 pub trait Artist: DynClone {
-    fn get_albums(&self) -> Vec<Box<dyn Album>>;
+    fn get_albums(&self) -> Vec<Box<dyn Album + Send + Sync>>;
     fn get_name(&self) -> String;
 }
 
@@ -28,10 +28,10 @@ pub trait Song: DynClone + Send {
 
 dyn_clone::clone_trait_object!(Song);
 
-pub trait Album: DynClone {
+pub trait Album: DynClone + Send {
     fn get_name(&self) -> String;
     fn get_release_date(&self) -> String;
-    fn get_songs(&self) -> Vec<Box<dyn Song>>;
+    fn get_songs(&self) -> Vec<Box<dyn Song + Send + Sync>>;
     fn is_groups(&self) -> bool;
     fn get_id(&self) -> String;
     fn is_local(&self) -> bool;

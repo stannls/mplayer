@@ -26,7 +26,7 @@ pub fn scan_artists() -> Vec<String> {
 #[derive(Clone)]
 pub struct FsArtist {
     path: PathBuf,
-    albums: Vec<Box<dyn super::Album>>,
+    albums: Vec<Box<dyn super::Album + Send + Sync>>,
 }
 
 impl FsArtist {
@@ -34,10 +34,12 @@ impl FsArtist {
         let mut path = audio_dir().unwrap();
         path.push("mplayer");
         path.push(name);
-        let mut albums: Vec<Box<dyn super::Album>> = fs::read_dir(path.to_owned())
+        let mut albums: Vec<Box<dyn super::Album + Send + Sync>> = fs::read_dir(path.to_owned())
             .unwrap()
             .into_iter()
-            .map(|f| Box::new(FsAlbum::new(f.unwrap().path()).unwrap()) as Box<dyn Album>)
+            .map(|f| {
+                Box::new(FsAlbum::new(f.unwrap().path()).unwrap()) as Box<dyn Album + Send + Sync>
+            })
             .collect();
         albums.sort_by(|a, b| {
             a.get_release_date()
@@ -52,7 +54,7 @@ impl FsArtist {
 }
 
 impl Artist for FsArtist {
-    fn get_albums(&self) -> Vec<Box<dyn super::Album>> {
+    fn get_albums(&self) -> Vec<Box<dyn super::Album + Send + Sync>> {
         self.albums.to_owned()
     }
 
@@ -64,15 +66,17 @@ impl Artist for FsArtist {
 #[derive(Clone)]
 pub struct FsAlbum {
     path: PathBuf,
-    songs: Vec<Box<dyn super::Song>>,
+    songs: Vec<Box<dyn super::Song + Send + Sync>>,
 }
 
 impl FsAlbum {
     pub fn new(path: PathBuf) -> Option<FsAlbum> {
-        let mut songs: Vec<Box<dyn super::Song>> = fs::read_dir(path.to_owned())
+        let mut songs: Vec<Box<dyn super::Song + Send + Sync>> = fs::read_dir(path.to_owned())
             .unwrap()
             .into_iter()
-            .map(|f| Box::new(FsSong::new(f.unwrap().path()).unwrap()) as Box<dyn Song>)
+            .map(|f| {
+                Box::new(FsSong::new(f.unwrap().path()).unwrap()) as Box<dyn Song + Send + Sync>
+            })
             .collect();
         songs.sort_by(|a, b| {
             a.get_number()
@@ -105,7 +109,7 @@ impl Album for FsAlbum {
             .unwrap_or("".to_string())
     }
 
-    fn get_songs(&self) -> Vec<Box<dyn super::Song>> {
+    fn get_songs(&self) -> Vec<Box<dyn super::Song + Send + Sync>> {
         self.songs.to_owned()
     }
 
@@ -208,7 +212,7 @@ impl Song for FsSong {
 }
 
 // Tries to find the album of the given song in the local files
-pub fn find_current_album(song_info: &SongInfo) -> Option<Box<dyn Album>> {
+pub fn find_current_album(song_info: &SongInfo) -> Option<Box<dyn Album + Send + Sync>> {
     let mut dir = audio_dir().unwrap();
     dir.push("mplayer");
     let artists = fs::read_dir(dir.clone())
