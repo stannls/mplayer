@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 crossterm = "0.26.1"
 musicbrainz_rs = "0.5.0"
-reqwest = "0.11.14"
+reqwest = {version = "0.11.14", features = ["blocking"]}
 tokio = {version = "1.26.0", features = ["full"]}
 tui = {package = "ratatui", version = "0.20.1"}
 chrono = "0.4.24"

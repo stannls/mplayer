@@ -1,7 +1,7 @@
 use crossterm::event::{self, KeyEvent, KeyCode};
+use tokio::task::spawn_blocking;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use std::thread;
 use std::time::{Duration, Instant};
 use crate::api::fs::{FsArtist, find_current_album};
 use crate::api::player::MusicPlayer;
@@ -10,6 +10,7 @@ use crate::api::search::wrapper::AlbumWrapper;
 use crate::ui::helpers;
 use super::interface::{UiState, MainWindowState, FocusedResult, SideMenu, Focus};
 use crate::api::download::download_pool::DownloadPool;
+use std::thread;
 
 
 pub enum Event<I> {
@@ -52,10 +53,12 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
         match input.code {
             KeyCode::Char('d') => match ui_state.main_window_state.to_owned() {
                 MainWindowState::SongFocus(s) => if !s.is_local() {
-                    downloader.download_song(s)
+                    let dl = downloader.clone();
+                    let _ = spawn_blocking(move || {dl.download_song(s)}).await;
                 },
                 MainWindowState::RecordFocus(r, _) => if !r.is_local(){
-                    downloader.download_album(r)
+                    let dl = downloader.clone();
+                    let _ = spawn_blocking(move || {dl.download_album(r)}).await;
                 },
                 _ => {}
             },
