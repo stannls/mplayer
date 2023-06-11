@@ -49,7 +49,6 @@ impl DownloadPool {
                 let fs = Arc::new(self.file_sorter.clone());
 
                 self.threadpool.execute(move || {
-                    println!("{current_link}");
                     let filepath = DownloadPool::download_from_link(
                         current_link,
                         format!(
