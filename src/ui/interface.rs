@@ -3,17 +3,18 @@ use super::input::Event;
 use super::input::handle_input;
 use crate::api::Artist;
 use crate::api::download::bandcamp_downloader::BandcampDownloader;
+use crate::api::fs::FsScanner;
 use crate::api::player::MusicPlayer;
 use crate::api::{Song, Album};
 use crate::api::download::download_pool::DownloadPool;
 use crate::api::download::musify_downloader::MusifyDownloader;
-use crate::api::fs::scan_artists;
 use crate::ui::{components, layout};
 use crossterm::event::EnableMouseCapture;
 use crossterm::event::{DisableMouseCapture, KeyEvent};
 use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen};
+use itertools::Itertools;
 use std::collections::VecDeque;
 use std::io;
 use std::{io::Stdout, sync::mpsc::Receiver};
@@ -30,7 +31,7 @@ pub(crate) struct UiState {
     pub(crate) main_window_state: MainWindowState,
     pub(crate) focused_result: FocusedResult,
     pub(crate) history: VecDeque<MainWindowState>,
-    pub(crate) artists: Vec<String>,
+    pub(crate) artists: Vec<Box<dyn Artist>>,
     pub(crate) side_menu: SideMenu,
     pub(crate) focus: Focus,
 }
@@ -116,6 +117,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         .add_downloader(MusifyDownloader::new())
         .add_downloader(BandcampDownloader::new());
     let music_player = MusicPlayer::new();
+    let mut fs_scanner = FsScanner::new();
     // Main UI render loop
     while !ui_state.quit {
         terminal
@@ -138,7 +140,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 
                 // Side menu
                 match ui_state.side_menu {
-                    SideMenu::Libary(i) => f.render_widget(components::build_libary(ui_state.artists.to_owned(), i, content_layout[0].height as usize - 3), content_layout[0]),
+                    SideMenu::Libary(i) => f.render_widget(components::build_libary(ui_state.artists.to_owned().into_iter().map(|f| f.get_name()).collect_vec(), i, content_layout[0].height as usize - 3), content_layout[0]),
                     SideMenu::Queue(i) => f.render_widget(components::build_queue(music_player.get_queue(), i, content_layout[0].height as usize - 3), content_layout[0]),
                     SideMenu::None => {},
                 }
@@ -202,6 +204,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                     f.render_widget(song_info, play_layout[0]);
                     f.render_widget(components::build_progress_bar(&current_song), play_layout[1])
                 }
+                ui_state.artists = fs_scanner.get_artists();
             })
         .unwrap();
 
@@ -210,7 +213,6 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
             Event::Input(event) => handle_input(event, &mut ui_state, &downloader, &music_player).await,
             _ => {}
         }
-        ui_state.artists = scan_artists();
     }
 }
 

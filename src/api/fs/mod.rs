@@ -3,53 +3,84 @@ use std::{
     path::PathBuf,
 };
 
+use super::{Album, Artist, Song};
 use crate::api::player::SongInfo;
 use audiotags::Tag;
 use chrono::Duration;
 use dirs::audio_dir;
+use itertools::Itertools;
 
-use super::{Album, Artist, Song};
+pub struct FsScanner {
+    artists: Option<Vec<Box<dyn Artist>>>,
+}
 
-pub fn scan_artists() -> Vec<String> {
-    let mut dir = audio_dir().unwrap();
-    dir.push("mplayer");
-    fs::create_dir_all(&dir).unwrap();
-    let mut artists: Vec<String> = fs::read_dir(dir)
-        .unwrap()
+impl FsScanner {
+    pub fn new() -> FsScanner {
+        FsScanner { artists: None }
+    }
+    pub fn get_artists(&mut self) -> Vec<Box<dyn Artist>> {
+        if self.artists.is_some() {
+            self.artists.clone().unwrap()
+        } else {
+            self.artists = Some(FsScanner::scan_files());
+            self.artists.clone().unwrap()
+        }
+    }
+    fn scan_files() -> Vec<Box<dyn Artist>> {
+        let mut dir = audio_dir().unwrap();
+        dir.push("mplayer");
+
+        let mut artists = depth_first_search_files(
+            fs::read_dir(dir)
+                .unwrap()
+                .filter(|f| f.is_ok())
+                .map(|f| f.unwrap())
+                .collect(),
+        )
         .into_iter()
-        .map(|f| f.unwrap().file_name().into_string().unwrap())
-        .collect();
-    artists.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
-    artists
+        .map(|f| Box::new(FsSong::new(f.path()).unwrap()) as Box<dyn Song + Send + Sync>)
+        .group_by(|f| f.get_album_name())
+        .into_iter()
+        .map(|f| Box::new(FsAlbum::new_2(f.1.collect_vec())) as Box<dyn Album + Send + Sync>)
+        .group_by(|f| f.get_songs()[0].get_artist_name())
+        .into_iter()
+        .map(|f| Box::new(FsArtist::new_2(f.1.collect_vec(), f.0)) as Box<dyn Artist>)
+        .collect_vec();
+        artists.sort_by_key(|a| a.get_name().to_lowercase());
+
+        artists
+    }
+}
+
+fn depth_first_search_files(files: Vec<DirEntry>) -> Vec<DirEntry> {
+    files
+        .into_iter()
+        .flat_map(|f| {
+            if f.file_type().unwrap().is_dir() {
+                depth_first_search_files(
+                    fs::read_dir(f.path())
+                        .unwrap()
+                        .filter(|f| f.is_ok())
+                        .map(|f| f.unwrap())
+                        .collect(),
+                )
+            } else {
+                vec![f]
+            }
+        })
+        .collect()
 }
 
 #[derive(Clone)]
 pub struct FsArtist {
-    path: PathBuf,
+    name: String,
     albums: Vec<Box<dyn super::Album + Send + Sync>>,
 }
 
 impl FsArtist {
-    pub fn new(name: String) -> Option<FsArtist> {
-        let mut path = audio_dir().unwrap();
-        path.push("mplayer");
-        path.push(name);
-        let mut albums: Vec<Box<dyn super::Album + Send + Sync>> = fs::read_dir(path.to_owned())
-            .unwrap()
-            .into_iter()
-            .map(|f| {
-                Box::new(FsAlbum::new(f.unwrap().path()).unwrap()) as Box<dyn Album + Send + Sync>
-            })
-            .collect();
-        albums.sort_by(|a, b| {
-            a.get_release_date()
-                .parse::<usize>()
-                .unwrap_or(0)
-                .partial_cmp(&b.get_release_date().parse::<usize>().unwrap_or(0))
-                .unwrap()
-        });
-        albums.reverse();
-        Some(FsArtist { path, albums })
+    pub fn new_2(mut albums: Vec<Box<dyn Album + Send + Sync>>, name: String) -> FsArtist {
+        albums.sort_by_key(|f| f.get_release_date());
+        FsArtist { name, albums }
     }
 }
 
@@ -59,13 +90,12 @@ impl Artist for FsArtist {
     }
 
     fn get_name(&self) -> String {
-        self.path.file_name().unwrap().to_str().unwrap().to_string()
+        self.name.to_owned()
     }
 }
 
 #[derive(Clone)]
 pub struct FsAlbum {
-    path: PathBuf,
     songs: Vec<Box<dyn super::Song + Send + Sync>>,
 }
 
@@ -87,13 +117,24 @@ impl FsAlbum {
                 .unwrap()
         });
 
-        Some(FsAlbum { path, songs })
+        Some(FsAlbum { songs })
+    }
+    pub fn new_2(mut songs: Vec<Box<dyn Song + Send + Sync>>) -> FsAlbum {
+        songs.sort_by_key(|f| f.get_number());
+        FsAlbum { songs }
     }
 }
 
 impl Album for FsAlbum {
     fn get_name(&self) -> String {
-        self.path.file_name().unwrap().to_str().unwrap().to_string()
+        self.songs
+            .to_owned()
+            .into_iter()
+            .map(|f| f.get_album_name())
+            .collect::<Vec<String>>()
+            .get(0)
+            .unwrap_or(&"".to_string())
+            .to_owned()
     }
 
     fn get_release_date(&self) -> String {
