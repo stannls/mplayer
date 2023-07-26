@@ -1,32 +1,76 @@
 use std::{
-    fs::{self, DirEntry},
+    fs::{self, DirEntry, File},
+    io::{self, Cursor, Read},
     path::PathBuf,
+    sync::{Arc, Mutex},
 };
 
 use super::{Album, Artist, Song};
 use crate::api::player::SongInfo;
 use audiotags::Tag;
 use chrono::Duration;
-use dirs::audio_dir;
+use dirs::{audio_dir, cache_dir};
 use itertools::Itertools;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 pub struct FsScanner {
-    artists: Option<Vec<Box<dyn Artist>>>,
+    artists: Arc<Mutex<Option<Vec<Box<dyn Artist + Send + Sync>>>>>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct SaveableSong {
+    path: PathBuf,
+    title: String,
+    length: f64,
+    number: u16,
+    album_name: String,
+    release_data: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct SaveableAlbum {
+    songs: Vec<SaveableSong>,
+    name: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct SaveableArtist {
+    albums: Vec<SaveableAlbum>,
+    name: String,
+}
+
+fn time_to_millis(time: String) -> Option<f64> {
+    let re = Regex::new(r"/(\d\d)[:](\d\d)/gm").unwrap();
+    let captures = re.captures(&time)?;
+    Some(captures[1].parse::<f64>().ok()? * 60000.0 + captures[2].parse::<f64>().ok()? * 1000.0)
 }
 
 impl FsScanner {
     pub fn new() -> FsScanner {
-        FsScanner { artists: None }
+        let artists =
+            Arc::new(Mutex::new(None)) as Arc<Mutex<Option<Vec<Box<dyn Artist + Sync + Send>>>>>;
+        FsScanner::start(artists.to_owned());
+        FsScanner { artists }
     }
-    pub fn get_artists(&mut self) -> Vec<Box<dyn Artist>> {
-        if self.artists.is_some() {
-            self.artists.clone().unwrap()
-        } else {
-            self.artists = Some(FsScanner::scan_files());
-            self.artists.clone().unwrap()
-        }
+    fn start(artists: Arc<Mutex<Option<Vec<Box<dyn Artist + Sync + Send>>>>>) {
+        std::thread::spawn(move || {
+            let mut guard = artists.lock().unwrap();
+            *guard = FsScanner::load_cached_artists().ok();
+            drop(guard);
+            loop {
+                let scanned_artists = FsScanner::scan_files();
+                let mut old_artists = artists.lock().unwrap();
+                *old_artists = Some(scanned_artists.to_owned());
+                let _ = FsScanner::cache_artists(scanned_artists);
+            }
+        });
     }
-    fn scan_files() -> Vec<Box<dyn Artist>> {
+    pub fn get_artists(&mut self) -> Vec<Box<dyn Artist + Send + Sync>> {
+        let artists = self.artists.lock().unwrap().to_owned();
+        artists.unwrap_or(vec![])
+    }
+    fn scan_files() -> Vec<Box<dyn Artist + Send + Sync>> {
         let mut dir = audio_dir().unwrap();
         dir.push("mplayer");
 
@@ -44,11 +88,108 @@ impl FsScanner {
         .map(|f| Box::new(FsAlbum::new_2(f.1.collect_vec())) as Box<dyn Album + Send + Sync>)
         .group_by(|f| f.get_songs()[0].get_artist_name())
         .into_iter()
-        .map(|f| Box::new(FsArtist::new_2(f.1.collect_vec(), f.0)) as Box<dyn Artist>)
+        .map(|f| Box::new(FsArtist::new_2(f.1.collect_vec(), f.0)) as Box<dyn Artist + Send + Sync>)
         .collect_vec();
         artists.sort_by_key(|a| a.get_name().to_lowercase());
 
         artists
+    }
+    fn artists_to_json(artists: Option<Vec<Box<dyn Artist + Send + Sync>>>) -> Option<String> {
+        match artists {
+            Some(f) => serde_json::to_string(
+                &f.into_iter()
+                    .map(|f| SaveableArtist {
+                        name: f.get_name(),
+                        albums: f
+                            .get_albums()
+                            .into_iter()
+                            .map(|f| SaveableAlbum {
+                                name: f.get_name(),
+                                songs: f
+                                    .get_songs()
+                                    .into_iter()
+                                    .filter(|f| f.get_filepath().is_some())
+                                    .map(|f| SaveableSong {
+                                        path: f.get_filepath().unwrap(),
+                                        title: f.get_title(),
+                                        length: time_to_millis(
+                                            f.get_length().unwrap_or("0".to_string()),
+                                        )
+                                        .unwrap_or(0 as f64),
+                                        number: f
+                                            .get_number()
+                                            .unwrap_or("0".to_string())
+                                            .parse()
+                                            .unwrap_or(0),
+                                        release_data: f
+                                            .get_release_date()
+                                            .unwrap_or("0".to_string()),
+                                        album_name: f.get_album_name(),
+                                    })
+                                    .collect(),
+                            })
+                            .collect(),
+                    })
+                    .collect::<Vec<SaveableArtist>>(),
+            )
+            .ok(),
+            _ => None,
+        }
+    }
+    pub fn cache_artists(artists: Vec<Box<dyn Artist + Send + Sync>>) -> Result<(), io::Error> {
+        let data = FsScanner::artists_to_json(Some(artists)).unwrap();
+        let mut path = cache_dir().ok_or(io::Error::new(
+            io::ErrorKind::Other,
+            "Failed to find config dir",
+        ))?;
+        path.push("mplayer");
+        fs::create_dir_all(&path)?;
+        path.push("artist_cache");
+        let mut file = File::create(&path)?;
+        let mut content = Cursor::new(data);
+        io::copy(&mut content, &mut file)?;
+        Ok(())
+    }
+    fn load_cached_artists() -> Result<Vec<Box<dyn Artist + Send + Sync>>, io::Error> {
+        let mut path = cache_dir().ok_or(io::Error::new(
+            io::ErrorKind::Other,
+            "Failed to find config dir",
+        ))?;
+        path.push("mplayer");
+        path.push("artist_cache");
+        let mut file = File::open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        let cached_artists: Vec<SaveableArtist> = serde_json::from_str(&contents)?;
+        Ok(cached_artists
+            .into_iter()
+            .map(|f| {
+                Box::new(FsArtist::new_2(
+                    f.albums
+                        .into_iter()
+                        .map(|f| {
+                            Box::new(FsAlbum::new_2(
+                                f.songs
+                                    .into_iter()
+                                    .map(|f| {
+                                        Box::new(FsSong::fastnew(
+                                            f.path,
+                                            f.title,
+                                            f.length,
+                                            f.number,
+                                            f.album_name,
+                                            f.release_data,
+                                        ))
+                                            as Box<dyn Song + Send + Sync>
+                                    })
+                                    .collect(),
+                            )) as Box<dyn Album + Send + Sync>
+                        })
+                        .collect(),
+                    f.name,
+                )) as Box<dyn Artist + Send + Sync>
+            })
+            .collect())
     }
 }
 
@@ -190,6 +331,23 @@ impl FsSong {
             album_name: tags.album_title().unwrap_or("").to_string(),
             release_data: tags.year().unwrap_or(0).to_string(),
         })
+    }
+    pub fn fastnew(
+        path: PathBuf,
+        title: String,
+        length: f64,
+        number: u16,
+        album_name: String,
+        release_data: String,
+    ) -> FsSong {
+        FsSong {
+            path,
+            title,
+            length,
+            number,
+            album_name,
+            release_data,
+        }
     }
 }
 

@@ -31,7 +31,7 @@ pub(crate) struct UiState {
     pub(crate) main_window_state: MainWindowState,
     pub(crate) focused_result: FocusedResult,
     pub(crate) history: VecDeque<MainWindowState>,
-    pub(crate) artists: Vec<Box<dyn Artist>>,
+    pub(crate) artists: Vec<Box<dyn Artist +Send +Sync>>,
     pub(crate) side_menu: SideMenu,
     pub(crate) focus: Focus,
 }
