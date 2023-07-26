@@ -261,7 +261,14 @@ impl FsAlbum {
         Some(FsAlbum { songs })
     }
     pub fn new_2(mut songs: Vec<Box<dyn Song + Send + Sync>>) -> FsAlbum {
-        songs.sort_by_key(|f| f.get_number());
+        songs.sort_by(|a, b| {
+            a.get_number()
+                .unwrap()
+                .parse::<isize>()
+                .unwrap()
+                .partial_cmp(&b.get_number().unwrap().parse::<isize>().unwrap())
+                .unwrap()
+        });
         FsAlbum { songs }
     }
 }
