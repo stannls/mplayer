@@ -3,7 +3,7 @@ use tokio::task::spawn_blocking;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
-use crate::api::fs::{FsArtist, find_current_album};
+use crate::api::fs::find_current_album;
 use crate::api::player::MusicPlayer;
 use crate::api::search::remote::{unique_releases, album_from_release_group_id};
 use crate::api::search::wrapper::AlbumWrapper;
@@ -295,7 +295,7 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                                 ui_state.history.push_front(ui_state.main_window_state.to_owned());
                                 ui_state.focus = Focus::MainWindow;
                                 ui_state.side_menu = SideMenu::Libary(None);
-                                ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(FsArtist::new(ui_state.artists.get(i.unwrap()).unwrap().to_owned()).unwrap()), None)
+                                ui_state.main_window_state = MainWindowState::ArtistFocus(ui_state.artists.get(i.unwrap()).unwrap().to_owned(), None);
                             },
                             SideMenu::Queue(_) => {},
                             SideMenu::None => {},

@@ -1,55 +1,227 @@
 use std::{
-    fs::{self, DirEntry},
+    fs::{self, DirEntry, File},
+    io::{self, Cursor, Read},
     path::PathBuf,
+    sync::{Arc, Mutex},
 };
 
+use super::{Album, Artist, Song};
 use crate::api::player::SongInfo;
 use audiotags::Tag;
 use chrono::Duration;
-use dirs::audio_dir;
+use dirs::{audio_dir, cache_dir};
+use itertools::Itertools;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 
-use super::{Album, Artist, Song};
+pub struct FsScanner {
+    artists: Arc<Mutex<Option<Vec<Box<dyn Artist + Send + Sync>>>>>,
+}
 
-pub fn scan_artists() -> Vec<String> {
-    let mut dir = audio_dir().unwrap();
-    dir.push("mplayer");
-    fs::create_dir_all(&dir).unwrap();
-    let mut artists: Vec<String> = fs::read_dir(dir)
-        .unwrap()
+#[derive(Clone, Serialize, Deserialize)]
+struct SaveableSong {
+    path: PathBuf,
+    title: String,
+    length: f64,
+    number: u16,
+    album_name: String,
+    release_data: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct SaveableAlbum {
+    songs: Vec<SaveableSong>,
+    name: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct SaveableArtist {
+    albums: Vec<SaveableAlbum>,
+    name: String,
+}
+
+fn time_to_millis(time: String) -> Option<f64> {
+    let re = Regex::new(r"/(\d\d)[:](\d\d)/gm").unwrap();
+    let captures = re.captures(&time)?;
+    Some(captures[1].parse::<f64>().ok()? * 60000.0 + captures[2].parse::<f64>().ok()? * 1000.0)
+}
+
+impl FsScanner {
+    pub fn new() -> FsScanner {
+        let artists =
+            Arc::new(Mutex::new(None)) as Arc<Mutex<Option<Vec<Box<dyn Artist + Sync + Send>>>>>;
+        FsScanner::start(artists.to_owned());
+        FsScanner { artists }
+    }
+    fn start(artists: Arc<Mutex<Option<Vec<Box<dyn Artist + Sync + Send>>>>>) {
+        std::thread::spawn(move || {
+            let mut guard = artists.lock().unwrap();
+            *guard = FsScanner::load_cached_artists().ok();
+            drop(guard);
+            loop {
+                let scanned_artists = FsScanner::scan_files();
+                let mut old_artists = artists.lock().unwrap();
+                *old_artists = Some(scanned_artists.to_owned());
+                let _ = FsScanner::cache_artists(scanned_artists);
+            }
+        });
+    }
+    pub fn get_artists(&mut self) -> Vec<Box<dyn Artist + Send + Sync>> {
+        let artists = self.artists.lock().unwrap().to_owned();
+        artists.unwrap_or(vec![])
+    }
+    fn scan_files() -> Vec<Box<dyn Artist + Send + Sync>> {
+        let mut dir = audio_dir().unwrap();
+        dir.push("mplayer");
+
+        let mut artists = depth_first_search_files(
+            fs::read_dir(dir)
+                .unwrap()
+                .filter(|f| f.is_ok())
+                .map(|f| f.unwrap())
+                .collect(),
+        )
         .into_iter()
-        .map(|f| f.unwrap().file_name().into_string().unwrap())
-        .collect();
-    artists.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
-    artists
+        .map(|f| Box::new(FsSong::new(f.path()).unwrap()) as Box<dyn Song + Send + Sync>)
+        .group_by(|f| f.get_album_name())
+        .into_iter()
+        .map(|f| Box::new(FsAlbum::new_2(f.1.collect_vec())) as Box<dyn Album + Send + Sync>)
+        .group_by(|f| f.get_songs()[0].get_artist_name())
+        .into_iter()
+        .map(|f| Box::new(FsArtist::new_2(f.1.collect_vec(), f.0)) as Box<dyn Artist + Send + Sync>)
+        .collect_vec();
+        artists.sort_by_key(|a| a.get_name().to_lowercase());
+
+        artists
+    }
+    fn artists_to_json(artists: Option<Vec<Box<dyn Artist + Send + Sync>>>) -> Option<String> {
+        match artists {
+            Some(f) => serde_json::to_string(
+                &f.into_iter()
+                    .map(|f| SaveableArtist {
+                        name: f.get_name(),
+                        albums: f
+                            .get_albums()
+                            .into_iter()
+                            .map(|f| SaveableAlbum {
+                                name: f.get_name(),
+                                songs: f
+                                    .get_songs()
+                                    .into_iter()
+                                    .filter(|f| f.get_filepath().is_some())
+                                    .map(|f| SaveableSong {
+                                        path: f.get_filepath().unwrap(),
+                                        title: f.get_title(),
+                                        length: time_to_millis(
+                                            f.get_length().unwrap_or("0".to_string()),
+                                        )
+                                        .unwrap_or(0 as f64),
+                                        number: f
+                                            .get_number()
+                                            .unwrap_or("0".to_string())
+                                            .parse()
+                                            .unwrap_or(0),
+                                        release_data: f
+                                            .get_release_date()
+                                            .unwrap_or("0".to_string()),
+                                        album_name: f.get_album_name(),
+                                    })
+                                    .collect(),
+                            })
+                            .collect(),
+                    })
+                    .collect::<Vec<SaveableArtist>>(),
+            )
+            .ok(),
+            _ => None,
+        }
+    }
+    pub fn cache_artists(artists: Vec<Box<dyn Artist + Send + Sync>>) -> Result<(), io::Error> {
+        let data = FsScanner::artists_to_json(Some(artists)).unwrap();
+        let mut path = cache_dir().ok_or(io::Error::new(
+            io::ErrorKind::Other,
+            "Failed to find config dir",
+        ))?;
+        path.push("mplayer");
+        fs::create_dir_all(&path)?;
+        path.push("artist_cache");
+        let mut file = File::create(&path)?;
+        let mut content = Cursor::new(data);
+        io::copy(&mut content, &mut file)?;
+        Ok(())
+    }
+    fn load_cached_artists() -> Result<Vec<Box<dyn Artist + Send + Sync>>, io::Error> {
+        let mut path = cache_dir().ok_or(io::Error::new(
+            io::ErrorKind::Other,
+            "Failed to find config dir",
+        ))?;
+        path.push("mplayer");
+        path.push("artist_cache");
+        let mut file = File::open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        let cached_artists: Vec<SaveableArtist> = serde_json::from_str(&contents)?;
+        Ok(cached_artists
+            .into_iter()
+            .map(|f| {
+                Box::new(FsArtist::new_2(
+                    f.albums
+                        .into_iter()
+                        .map(|f| {
+                            Box::new(FsAlbum::new_2(
+                                f.songs
+                                    .into_iter()
+                                    .map(|f| {
+                                        Box::new(FsSong::fastnew(
+                                            f.path,
+                                            f.title,
+                                            f.length,
+                                            f.number,
+                                            f.album_name,
+                                            f.release_data,
+                                        ))
+                                            as Box<dyn Song + Send + Sync>
+                                    })
+                                    .collect(),
+                            )) as Box<dyn Album + Send + Sync>
+                        })
+                        .collect(),
+                    f.name,
+                )) as Box<dyn Artist + Send + Sync>
+            })
+            .collect())
+    }
+}
+
+fn depth_first_search_files(files: Vec<DirEntry>) -> Vec<DirEntry> {
+    files
+        .into_iter()
+        .flat_map(|f| {
+            if f.file_type().unwrap().is_dir() {
+                depth_first_search_files(
+                    fs::read_dir(f.path())
+                        .unwrap()
+                        .filter(|f| f.is_ok())
+                        .map(|f| f.unwrap())
+                        .collect(),
+                )
+            } else {
+                vec![f]
+            }
+        })
+        .collect()
 }
 
 #[derive(Clone)]
 pub struct FsArtist {
-    path: PathBuf,
+    name: String,
     albums: Vec<Box<dyn super::Album + Send + Sync>>,
 }
 
 impl FsArtist {
-    pub fn new(name: String) -> Option<FsArtist> {
-        let mut path = audio_dir().unwrap();
-        path.push("mplayer");
-        path.push(name);
-        let mut albums: Vec<Box<dyn super::Album + Send + Sync>> = fs::read_dir(path.to_owned())
-            .unwrap()
-            .into_iter()
-            .map(|f| {
-                Box::new(FsAlbum::new(f.unwrap().path()).unwrap()) as Box<dyn Album + Send + Sync>
-            })
-            .collect();
-        albums.sort_by(|a, b| {
-            a.get_release_date()
-                .parse::<usize>()
-                .unwrap_or(0)
-                .partial_cmp(&b.get_release_date().parse::<usize>().unwrap_or(0))
-                .unwrap()
-        });
-        albums.reverse();
-        Some(FsArtist { path, albums })
+    pub fn new_2(mut albums: Vec<Box<dyn Album + Send + Sync>>, name: String) -> FsArtist {
+        albums.sort_by_key(|f| f.get_release_date());
+        FsArtist { name, albums }
     }
 }
 
@@ -59,13 +231,12 @@ impl Artist for FsArtist {
     }
 
     fn get_name(&self) -> String {
-        self.path.file_name().unwrap().to_str().unwrap().to_string()
+        self.name.to_owned()
     }
 }
 
 #[derive(Clone)]
 pub struct FsAlbum {
-    path: PathBuf,
     songs: Vec<Box<dyn super::Song + Send + Sync>>,
 }
 
@@ -87,13 +258,24 @@ impl FsAlbum {
                 .unwrap()
         });
 
-        Some(FsAlbum { path, songs })
+        Some(FsAlbum { songs })
+    }
+    pub fn new_2(mut songs: Vec<Box<dyn Song + Send + Sync>>) -> FsAlbum {
+        songs.sort_by_key(|f| f.get_number());
+        FsAlbum { songs }
     }
 }
 
 impl Album for FsAlbum {
     fn get_name(&self) -> String {
-        self.path.file_name().unwrap().to_str().unwrap().to_string()
+        self.songs
+            .to_owned()
+            .into_iter()
+            .map(|f| f.get_album_name())
+            .collect::<Vec<String>>()
+            .get(0)
+            .unwrap_or(&"".to_string())
+            .to_owned()
     }
 
     fn get_release_date(&self) -> String {
@@ -149,6 +331,23 @@ impl FsSong {
             album_name: tags.album_title().unwrap_or("").to_string(),
             release_data: tags.year().unwrap_or(0).to_string(),
         })
+    }
+    pub fn fastnew(
+        path: PathBuf,
+        title: String,
+        length: f64,
+        number: u16,
+        album_name: String,
+        release_data: String,
+    ) -> FsSong {
+        FsSong {
+            path,
+            title,
+            length,
+            number,
+            album_name,
+            release_data,
+        }
     }
 }
 
