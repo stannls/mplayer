@@ -2,7 +2,7 @@ use crate::api::search::wrapper;
 use musicbrainz_rs::entity::artist::{Artist, ArtistSearchQuery};
 use musicbrainz_rs::entity::recording::{Recording, RecordingSearchQuery};
 use musicbrainz_rs::entity::release::{self, Release, ReleasePackaging};
-use musicbrainz_rs::entity::release_group::{ReleaseGroup, ReleaseGroupSearchQuery};
+use musicbrainz_rs::entity::release_group::{ReleaseGroup, ReleaseGroupSearchQuery, ReleaseGroupPrimaryType};
 use musicbrainz_rs::prelude::*;
 use reqwest::Error;
 
@@ -90,6 +90,8 @@ pub async fn unique_releases(artist_id: String) -> Vec<ReleaseGroup> {
         .unwrap()
         .entities
         .into_iter()
+        .filter(|f| f.primary_type.is_some())
+        .filter(|f| matches!(f.primary_type.to_owned().unwrap(), ReleaseGroupPrimaryType::Album) || matches!(f.primary_type.to_owned().unwrap(), ReleaseGroupPrimaryType::Ep))
         .filter(|f| matches!(f.first_release_date, Option::Some(_)))
         .collect::<Vec<ReleaseGroup>>();
     release_groups.sort_by(|a, b| b.first_release_date.unwrap().cmp(&a.first_release_date.unwrap()));
