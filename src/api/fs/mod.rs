@@ -40,8 +40,8 @@ struct SaveableArtist {
     name: String,
 }
 
-fn time_to_millis(time: String) -> Option<f64> {
-    let re = Regex::new(r"/(\d\d)[:](\d\d)/gm").unwrap();
+pub fn time_to_millis(time: String) -> Option<f64> {
+    let re = Regex::new(r"(\d\d)[:](\d\d)").unwrap();
     let captures = re.captures(&time)?;
     Some(captures[1].parse::<f64>().ok()? * 60000.0 + captures[2].parse::<f64>().ok()? * 1000.0)
 }
@@ -113,7 +113,7 @@ impl FsScanner {
                                         path: f.get_filepath().unwrap(),
                                         title: f.get_title(),
                                         length: time_to_millis(
-                                            f.get_length().unwrap_or("0".to_string()),
+                                            f.get_length().unwrap_or("00:00".to_string()),
                                         )
                                         .unwrap_or(0 as f64),
                                         number: f
