@@ -1,6 +1,8 @@
 use crate::api::download::SongProvider;
 use crate::api::{Album, Song};
 use markup5ever::interface::QualName;
+use markup5ever::tendril::fmt::UTF8;
+use markup5ever::tendril::Tendril;
 use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::sync::Arc;
@@ -81,6 +83,7 @@ impl MusifyDownloader {
             .send()?
             .text()?;
         let dom = Html::parse_document(&page);
+
         let playlist_selector = Selector::parse("div.playlist>div").unwrap();
         let playlist_control_selector = Selector::parse("div.playlist__control").unwrap();
         let playlist_items = dom
@@ -96,9 +99,9 @@ impl MusifyDownloader {
                         ns: Atom::from(""),
                         local: Atom::from("data-url"),
                     })
-                    .unwrap()
-                    .to_string()
             })
+            .filter(|f| f.is_some())
+            .map(|f| f.unwrap().to_string())
             .map(|f| format!("https://musify.club{}", f))
             .collect();
         Ok(playlist_items)
