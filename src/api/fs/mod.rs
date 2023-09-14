@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{Album, Artist, Song};
+use super::{Album, Artist, Deleteable, Song};
 use crate::api::player::SongInfo;
 use audiotags::Tag;
 use chrono::Duration;
@@ -233,6 +233,17 @@ impl Artist for FsArtist {
     fn get_name(&self) -> String {
         self.name.to_owned()
     }
+    fn is_local(&self) -> bool {
+        true
+    }
+}
+
+impl Deleteable for FsArtist {
+    fn delete(&self) {
+        for album in &self.albums {
+            album.delete();
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -312,6 +323,14 @@ impl Album for FsAlbum {
 
     fn is_local(&self) -> bool {
         true
+    }
+}
+
+impl Deleteable for FsAlbum {
+    fn delete(&self) {
+        for song in &self.songs {
+            song.delete();
+        }
     }
 }
 
@@ -414,6 +433,12 @@ impl Song for FsSong {
         } else {
             Some(self.release_data.to_owned())
         }
+    }
+}
+
+impl Deleteable for FsSong {
+    fn delete(&self) {
+        fs::remove_file(&self.path);
     }
 }
 
