@@ -346,6 +346,7 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                         _ => {}
                     }
                     ui_state.main_window_state = MainWindowState::Help;
+                    ui_state.side_menu = SideMenu::Libary(None);
                     ui_state.delete = false;
                 },
                 KeyCode::Char('n') => {ui_state.delete = false},
