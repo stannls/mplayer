@@ -3,7 +3,7 @@ use tokio::task::spawn_blocking;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
-use crate::api::fs::find_current_album;
+use crate::api::fs::{find_current_album, FsScanner};
 use crate::api::player::MusicPlayer;
 use crate::api::search::remote::{unique_releases, album_from_release_group_id};
 use crate::api::search::wrapper::AlbumWrapper;
@@ -44,7 +44,7 @@ pub fn create_input_channel() -> Receiver<Event<KeyEvent>> {
     rx
 }
 
-pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downloader: &DownloadPool, music_player: &MusicPlayer) {
+pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downloader: &DownloadPool, music_player: &MusicPlayer, fs_scanner: &mut FsScanner) {
     // Match arm for inputting text
     if ui_state.searching {
         handle_search_input(input, ui_state).await
@@ -333,12 +333,15 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                     match ui_state.main_window_state.clone() {
                         MainWindowState::SongFocus(s) => {
                             s.delete();
+                            fs_scanner.remove_song(s);
                         },
                         MainWindowState::RecordFocus(r, _) => {
                             r.delete();
+                            fs_scanner.remove_album(r);
                         },
                         MainWindowState::ArtistFocus(a, _) => {
                             a.delete();
+                            fs_scanner.remove_artist(a);
                         },
                         _ => {}
                     }

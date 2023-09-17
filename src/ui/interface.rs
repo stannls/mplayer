@@ -51,8 +51,8 @@ pub(crate) struct UiState {
 pub(crate) enum MainWindowState {
     Help,
     Results((Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)),
-    SongFocus(Box<dyn Song>),
-    ArtistFocus(Box<dyn Artist>, Option<usize>),
+    SongFocus(Box<dyn Song +Send +Sync>),
+    ArtistFocus(Box<dyn Artist + Send +Sync>, Option<usize>),
     RecordFocus(Box<dyn Album + Send + Sync>, Option<usize>),
 }
 
@@ -238,7 +238,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 
         // Handles keyboard input
         match rx.recv().unwrap() {
-            Event::Input(event) => handle_input(event, &mut ui_state, &downloader, &music_player).await,
+            Event::Input(event) => handle_input(event, &mut ui_state, &downloader, &music_player, &mut fs_scanner).await,
             _ => {}
         }
     }
