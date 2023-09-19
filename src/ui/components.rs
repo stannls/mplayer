@@ -86,8 +86,10 @@ pub fn build_searchbar(searchbar_content: Option<String>) -> Paragraph<'static> 
 pub fn build_focus_toolbox(toolbar_type: ToolbarType) -> Paragraph<'static> {
     Paragraph::new(match toolbar_type {
         ToolbarType::Download => "[b]ack [d]ownload [↑]up [↓]down [enter]select".to_string(),
-        ToolbarType::Play => "[b]ack [p]lay [e]nqueue [↑]up [↓]down [enter]select".to_string(),
-        ToolbarType::Default => "[b]ack [↑]up [↓]down [enter]select".to_string(),
+        ToolbarType::Play => {
+            "[b]ack [p]lay [e]nqueue [↑]up [↓]down [enter]select [D]elete".to_string()
+        }
+        ToolbarType::Default => "[b]ack [↑]up [↓]down [enter]select [D]elete".to_string(),
     })
 }
 

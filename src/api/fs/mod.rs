@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{Album, Artist, Song};
+use super::{Album, Artist, Deleteable, Song};
 use crate::api::player::SongInfo;
 use audiotags::Tag;
 use chrono::Duration;
@@ -52,6 +52,85 @@ impl FsScanner {
             Arc::new(Mutex::new(None)) as Arc<Mutex<Option<Vec<Box<dyn Artist + Sync + Send>>>>>;
         FsScanner::start(artists.to_owned());
         FsScanner { artists }
+    }
+    pub fn remove_artist(&mut self, artist: Box<dyn Artist + Send + Sync>) {
+        let mut artists = self.artists.lock().unwrap();
+        match artists.to_owned() {
+            Some(a) => {
+                let index = a
+                    .iter()
+                    .position(|x| *x.get_name() == artist.get_name())
+                    .unwrap();
+                let mut new_artists = artists.to_owned().unwrap();
+                new_artists.remove(index);
+                *artists = Some(new_artists);
+                let _ = FsScanner::cache_artists(artists.to_owned().unwrap());
+            }
+            None => {}
+        }
+    }
+    pub fn remove_album(&mut self, album: Box<dyn Album + Send + Sync>) {
+        let mut artists = self.artists.lock().unwrap();
+        match artists.to_owned() {
+            Some(a) => {
+                let artist_index = a
+                    .iter()
+                    .position(|x| {
+                        *x.get_name() == album.get_songs().get(0).unwrap().get_artist_name()
+                    })
+                    .unwrap();
+                let artist = a.get(artist_index).unwrap();
+                let new_artist = Box::new(FsArtist::new_2(
+                    artist
+                        .get_albums()
+                        .iter()
+                        .filter(|x| x.get_name() != album.get_name())
+                        .map(|f| f.to_owned())
+                        .collect(),
+                    artist.get_name(),
+                )) as Box<dyn Artist + Send + Sync>;
+                let mut new_artists = a.to_owned();
+                new_artists[artist_index] = new_artist;
+                *artists = Some(new_artists);
+                let _ = FsScanner::cache_artists(artists.to_owned().unwrap());
+            }
+            None => {}
+        }
+    }
+    pub fn remove_song(&mut self, song: Box<dyn Song + Send + Sync>) {
+        let mut artists = self.artists.lock().unwrap();
+        match artists.to_owned() {
+            Some(a) => {
+                let artist_index = a
+                    .iter()
+                    .position(|x| *x.get_name() == song.get_artist_name())
+                    .unwrap();
+                let artist = a.get(artist_index).unwrap();
+                let album_index = artist
+                    .get_albums()
+                    .iter()
+                    .position(|x| *x.get_name() == song.get_album_name())
+                    .unwrap();
+                let new_songs = artist
+                    .get_albums()
+                    .get(album_index)
+                    .unwrap()
+                    .get_songs()
+                    .iter()
+                    .filter(|x| x.get_title() != song.get_title())
+                    .map(|f| f.to_owned())
+                    .collect();
+                let new_album = Box::new(FsAlbum::new_2(new_songs)) as Box<dyn Album + Send + Sync>;
+                let mut new_albums = artist.get_albums();
+                new_albums[album_index] = new_album;
+                let new_artist = Box::new(FsArtist::new_2(new_albums, artist.get_name()));
+                let mut new_artists = a.to_owned();
+                new_artists[artist_index] = new_artist;
+                *artists = Some(new_artists);
+                let _ = FsScanner::cache_artists(artists.to_owned().unwrap());
+            }
+            None => {}
+        }
     }
     fn start(artists: Arc<Mutex<Option<Vec<Box<dyn Artist + Sync + Send>>>>>) {
         std::thread::spawn(move || {
@@ -233,6 +312,17 @@ impl Artist for FsArtist {
     fn get_name(&self) -> String {
         self.name.to_owned()
     }
+    fn is_local(&self) -> bool {
+        true
+    }
+}
+
+impl Deleteable for FsArtist {
+    fn delete(&self) {
+        for album in &self.albums {
+            album.delete();
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -312,6 +402,14 @@ impl Album for FsAlbum {
 
     fn is_local(&self) -> bool {
         true
+    }
+}
+
+impl Deleteable for FsAlbum {
+    fn delete(&self) {
+        for song in &self.songs {
+            song.delete();
+        }
     }
 }
 
@@ -414,6 +512,12 @@ impl Song for FsSong {
         } else {
             Some(self.release_data.to_owned())
         }
+    }
+}
+
+impl Deleteable for FsSong {
+    fn delete(&self) {
+        let _ = fs::remove_file(&self.path);
     }
 }
 

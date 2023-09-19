@@ -1,4 +1,4 @@
-use crate::api::{Album, Artist, Song};
+use crate::api::{Album, Artist, Deleteable, Song};
 use chrono::Duration;
 use musicbrainz_rs::entity::{
     artist, recording,
@@ -43,6 +43,9 @@ impl Artist for ArtistWrapper {
             .into_iter()
             .map(|f| Box::new(ReleaseGroupWrapper::new(f)) as Box<dyn Album + Send + Sync>)
             .collect()
+    }
+    fn is_local(&self) -> bool {
+        false
     }
 }
 
@@ -295,4 +298,24 @@ impl Song for TrackWrapper {
     fn get_release_date(&self) -> Option<String> {
         None
     }
+}
+
+impl Deleteable for ArtistWrapper {
+    fn delete(&self) {}
+}
+
+impl Deleteable for AlbumWrapper {
+    fn delete(&self) {}
+}
+
+impl Deleteable for TrackWrapper {
+    fn delete(&self) {}
+}
+
+impl Deleteable for SongWrapper {
+    fn delete(&self) {}
+}
+
+impl Deleteable for ReleaseGroupWrapper {
+    fn delete(&self) {}
 }

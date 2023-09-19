@@ -15,10 +15,19 @@ use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen};
 use itertools::Itertools;
+use tui::style::Modifier;
+use tui::style::Style;
+use tui::text::Span;
+use tui::text::Spans;
+use tui::widgets::Block;
+use tui::widgets::Borders;
+use tui::widgets::Clear;
+use tui::widgets::Paragraph;
 use std::collections::VecDeque;
 use std::io;
 use std::{io::Stdout, sync::mpsc::Receiver};
 use tui::{backend::CrosstermBackend, Terminal};
+use super::helpers;
 
 
 use crate::api::search::wrapper::{self, ArtistWrapper, SongWrapper, ReleaseGroupWrapper};
@@ -34,14 +43,15 @@ pub(crate) struct UiState {
     pub(crate) artists: Vec<Box<dyn Artist +Send +Sync>>,
     pub(crate) side_menu: SideMenu,
     pub(crate) focus: Focus,
+    pub(crate) delete: bool,
 }
 
 #[derive(Clone)]
 pub(crate) enum MainWindowState {
     Help,
     Results((Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)),
-    SongFocus(Box<dyn Song>),
-    ArtistFocus(Box<dyn Artist>, Option<usize>),
+    SongFocus(Box<dyn Song +Send +Sync>),
+    ArtistFocus(Box<dyn Artist + Send +Sync>, Option<usize>),
     RecordFocus(Box<dyn Album + Send + Sync>, Option<usize>),
 }
 
@@ -80,7 +90,8 @@ impl UiState {
             history: VecDeque::new(),
             artists: vec![],
             side_menu: SideMenu::Libary(None),
-            focus: Focus::None
+            focus: Focus::None,
+            delete: false
         }
     }
 }
@@ -205,12 +216,28 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                     f.render_widget(components::build_progress_bar(&current_song), play_layout[1])
                 }
                 ui_state.artists = fs_scanner.get_artists();
+                if ui_state.delete {
+                    let text = vec![
+                        Spans::from(vec![
+                                    Span::raw("Are you sure that you want to delete that?")
+                        ]),
+                        Spans::from(vec![]),
+                        Spans::from(vec![
+                                    Span::styled("[y]es", Style::default().add_modifier(Modifier::BOLD)),
+                                    Span::styled(" [n]o", Style::default().add_modifier(Modifier::BOLD))
+                        ])
+                    ];
+                    let block = Paragraph::new(text).block( Block::default().title("Delete Confirmation").borders(Borders::all()));
+                    let area = helpers::centered_rect(60, 20, size);
+                    f.render_widget(Clear, area);
+                    f.render_widget(block, area);
+                }
             })
         .unwrap();
 
         // Handles keyboard input
         match rx.recv().unwrap() {
-            Event::Input(event) => handle_input(event, &mut ui_state, &downloader, &music_player).await,
+            Event::Input(event) => handle_input(event, &mut ui_state, &downloader, &music_player, &mut fs_scanner).await,
             _ => {}
         }
     }

@@ -1,8 +1,6 @@
 use crate::api::download::SongProvider;
 use crate::api::{Album, Song};
 use markup5ever::interface::QualName;
-use markup5ever::tendril::fmt::UTF8;
-use markup5ever::tendril::Tendril;
 use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::sync::Arc;
