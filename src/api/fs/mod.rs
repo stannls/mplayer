@@ -1,7 +1,6 @@
 use std::{
     fs::{self, DirEntry, File},
     io::{self, Cursor, Read},
-    iter,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -65,6 +64,7 @@ impl FsScanner {
                 let mut new_artists = artists.to_owned().unwrap();
                 new_artists.remove(index);
                 *artists = Some(new_artists);
+                let _ = FsScanner::cache_artists(artists.to_owned().unwrap());
             }
             None => {}
         }
@@ -92,6 +92,7 @@ impl FsScanner {
                 let mut new_artists = a.to_owned();
                 new_artists[artist_index] = new_artist;
                 *artists = Some(new_artists);
+                let _ = FsScanner::cache_artists(artists.to_owned().unwrap());
             }
             None => {}
         }
@@ -126,6 +127,7 @@ impl FsScanner {
                 let mut new_artists = a.to_owned();
                 new_artists[artist_index] = new_artist;
                 *artists = Some(new_artists);
+                let _ = FsScanner::cache_artists(artists.to_owned().unwrap());
             }
             None => {}
         }
@@ -515,7 +517,7 @@ impl Song for FsSong {
 
 impl Deleteable for FsSong {
     fn delete(&self) {
-        fs::remove_file(&self.path);
+        let _ = fs::remove_file(&self.path);
     }
 }
 

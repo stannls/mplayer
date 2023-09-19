@@ -2,7 +2,6 @@ use super::components::ToolbarType;
 use super::input::Event;
 use super::input::handle_input;
 use crate::api::Artist;
-use crate::api::Deleteable;
 use crate::api::download::bandcamp_downloader::BandcampDownloader;
 use crate::api::fs::FsScanner;
 use crate::api::player::MusicPlayer;
