@@ -332,15 +332,24 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                 KeyCode::Char('y') => {
                     match ui_state.main_window_state.clone() {
                         MainWindowState::SongFocus(s) => {
-                            s.delete();
+                            let new_s = s.to_owned();
+                            thread::spawn(move || {
+                                new_s.delete();
+                            });
                             fs_scanner.remove_song(s);
                         },
                         MainWindowState::RecordFocus(r, _) => {
-                            r.delete();
+                            let new_r = r.to_owned();
+                            thread::spawn(move || {
+                                new_r.delete();
+                            });
                             fs_scanner.remove_album(r);
                         },
                         MainWindowState::ArtistFocus(a, _) => {
-                            a.delete();
+                            let new_a = a.to_owned();
+                            thread::spawn(move || {
+                                new_a.delete();
+                            });
                             fs_scanner.remove_artist(a);
                         },
                         _ => {}
