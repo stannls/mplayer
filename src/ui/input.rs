@@ -55,11 +55,11 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                 KeyCode::Char('d') => match ui_state.main_window_state.to_owned() {
                     MainWindowState::SongFocus(s) => if !s.is_local() {
                         let dl = downloader.clone();
-                        let _ = spawn_blocking(move || {dl.download_song(s)}).await;
+                        let _ = thread::spawn(move || {dl.download_song(s)});
                     },
                     MainWindowState::RecordFocus(r, _) => if !r.is_local(){
                         let dl = downloader.clone();
-                        let _ = spawn_blocking(move || {dl.download_album(r)}).await;
+                        let _ = thread::spawn(move || {dl.download_album(r)});
                     },
                     _ => {}
                 },
