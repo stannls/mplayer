@@ -1,5 +1,5 @@
 use crossterm::event::{self, KeyEvent, KeyCode};
-use tokio::task::spawn_blocking;
+
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
