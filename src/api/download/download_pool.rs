@@ -6,6 +6,8 @@ use std::fs::File;
 use std::io::Cursor;
 use std::sync::Arc;
 use threadpool::ThreadPool;
+use std::panic;
+use std::num::ParseIntError;
 
 #[derive(Clone)]
 pub struct DownloadPool {
@@ -31,6 +33,9 @@ impl DownloadPool {
         let download_link = self.try_all_song_providers(recording.clone());
         if download_link.is_some() {
             self.threadpool.execute(move || {
+                panic::set_hook(Box::new(|_info| {
+                    // do nothing
+                }));
                 let filepath = DownloadPool::download_from_link(
                     download_link.unwrap(),
                     format!("{}-{}", recording.get_artist_name(), recording.get_title()),
