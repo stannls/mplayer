@@ -7,7 +7,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 use threadpool::ThreadPool;
 use std::panic;
-use std::num::ParseIntError;
+
 
 #[derive(Clone)]
 pub struct DownloadPool {
