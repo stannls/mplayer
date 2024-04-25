@@ -89,15 +89,25 @@ impl DownloadPool {
         return None;
     }
     fn try_all_album_providers(&self, album: Box<dyn Album + Send + Sync>) -> Option<Vec<String>> {
+        let mut provided = vec![];
         for downloader in self.downloaders.clone() {
-            match downloader.provide_album(album.clone()) {
+            let filenames = downloader.provide_album(album.to_owned());
+            match filenames {
                 Ok(filenames) => if filenames.len() == album.get_songs().len() {
-                    return Some(filenames)
-                },
+                    return Some(filenames);
+                } else {
+                    provided.push(filenames);
+                }
                 _ => {}
             }
         }
-        return None;
+        return if provided.len() > 0 {
+            provided.sort_by_key(|filenames| filenames.len());
+            provided.reverse();
+            Some(provided[0].to_owned())
+        } else {    
+            return None;
+        }
     }
 }
 unsafe impl Send for DownloadPool {}

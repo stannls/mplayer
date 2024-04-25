@@ -165,6 +165,9 @@ impl Album for ReleaseGroupWrapper {
     fn get_name(&self) -> String {
         self.data.title.to_owned()
     }
+    fn get_artist_name(&self) -> String {
+        self.data.artist_credit.to_owned().unwrap()[0].name.to_owned()
+    }
     fn get_release_date(&self) -> String {
         self.data.first_release_date.unwrap().to_string()
     }
@@ -197,6 +200,9 @@ impl AlbumWrapper {
 impl Album for AlbumWrapper {
     fn get_name(&self) -> String {
         self.data.title.to_owned()
+    }
+    fn get_artist_name(&self) -> String {
+        self.data.artist_credit.to_owned().unwrap()[0].name.to_owned()
     }
     fn get_release_date(&self) -> String {
         self.data.date.unwrap().to_string()

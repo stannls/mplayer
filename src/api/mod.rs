@@ -31,6 +31,7 @@ dyn_clone::clone_trait_object!(Song);
 
 pub trait Album: DynClone + Send + Deleteable {
     fn get_name(&self) -> String;
+    fn get_artist_name(&self) -> String;
     fn get_release_date(&self) -> String;
     fn get_songs(&self) -> Vec<Box<dyn Song + Send + Sync>>;
     fn is_groups(&self) -> bool;

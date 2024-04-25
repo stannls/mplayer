@@ -106,7 +106,7 @@ impl AlbumProvider for BandcampDownloader {
         &self,
         album: Box<dyn Album + Send + Sync>,
     ) -> std::result::Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
-        let album_page = BandcampDownloader::get_album_page_link(&album.get_name())?;
+        let album_page = BandcampDownloader::get_album_page_link(&format!("{}-{}", album.get_artist_name(), album.get_name()))?;
         BandcampDownloader::extract_audio_links(&album_page)
     }
 }

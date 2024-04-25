@@ -125,7 +125,7 @@ impl AlbumProvider for MusifyDownloader {
         &self,
         album: Box<dyn Album + Send + Sync>,
     ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
-        let page_link = MusifyDownloader::get_page_link(album.get_name(), PageType::Album)?;
+        let page_link = MusifyDownloader::get_page_link(format!("{}-{}", album.get_artist_name(), album.get_name()), PageType::Album)?;
         MusifyDownloader::get_links_from_album_page(page_link)
     }
 }

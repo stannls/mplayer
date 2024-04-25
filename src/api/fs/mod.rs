@@ -387,7 +387,16 @@ impl Album for FsAlbum {
             .unwrap_or(&"".to_string())
             .to_owned()
     }
-
+    fn get_artist_name(&self) -> String {
+        self.songs
+            .to_owned()
+            .into_iter()
+            .map(|f| f.get_artist_name())
+            .collect::<Vec<String>>()
+            .get(0)
+            .unwrap_or(&"".to_string())
+            .to_owned()
+    }
     fn get_release_date(&self) -> String {
         self.songs
             .to_owned()
