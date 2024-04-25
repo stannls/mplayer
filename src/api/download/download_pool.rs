@@ -91,7 +91,9 @@ impl DownloadPool {
     fn try_all_album_providers(&self, album: Box<dyn Album + Send + Sync>) -> Option<Vec<String>> {
         for downloader in self.downloaders.clone() {
             match downloader.provide_album(album.clone()) {
-                Ok(filenames) => return Some(filenames),
+                Ok(filenames) => if filenames.len() == album.get_songs().len() {
+                    return Some(filenames)
+                },
                 _ => {}
             }
         }
