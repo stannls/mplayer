@@ -26,6 +26,8 @@ use tui::widgets::Borders;
 use tui::widgets::Clear;
 use tui::widgets::Paragraph;
 use tui::{backend::CrosstermBackend, Terminal};
+use super::helpers;
+use crate::ui::components::EmtpyEntity;
 
 #[derive(Clone)]
 pub(crate) struct UiState {
