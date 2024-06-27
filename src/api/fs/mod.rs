@@ -546,7 +546,6 @@ impl Deleteable for FsSong {
 // Tries to find the album of the given song in the local files
 pub fn find_current_album(song_info: &SongInfo) -> Option<Box<dyn Album + Send + Sync>> {
     let mut dir = audio_dir().unwrap();
-    dir.push("mplayer");
     let artists = fs::read_dir(dir.clone())
         .unwrap()
         .into_iter()
