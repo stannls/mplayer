@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use super::scroll_components::ScrollTable;
-use crate::api::{player::SongInfo, search::wrapper, Album, Artist, Song};
+use crate::api::{player::SongInfo, Album, Artist, Song};
 
 use tui::{
     layout::Constraint,
@@ -93,8 +93,19 @@ pub fn build_focus_toolbox(toolbar_type: ToolbarType) -> Paragraph<'static> {
     })
 }
 
+pub trait SearchEntity {
+    fn display(&self) -> String;
+}
+
+pub struct EmtpyEntity{}
+impl SearchEntity for EmtpyEntity {
+    fn display(&self) -> String {
+        "".to_string()
+    }
+}
+
 // Builds a result box based of the SearchEntity Trait
-pub fn build_result_box<T: wrapper::SearchEntity>(
+pub fn build_result_box<T: SearchEntity>(
     title: String,
     content: Vec<T>,
     focused_result: Option<usize>,

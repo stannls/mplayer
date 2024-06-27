@@ -5,11 +5,8 @@ use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 use crate::api::fs::{find_current_album, FsScanner};
 use crate::api::player::MusicPlayer;
-use crate::api::search::remote::{unique_releases, album_from_release_group_id};
-use crate::api::search::wrapper::AlbumWrapper;
 use crate::ui::helpers;
 use super::interface::{UiState, MainWindowState, FocusedResult, SideMenu, Focus};
-use crate::api::download::download_pool::DownloadPool;
 use std::thread;
 
 
@@ -44,7 +41,7 @@ pub fn create_input_channel() -> Receiver<Event<KeyEvent>> {
     rx
 }
 
-pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downloader: &DownloadPool, music_player: &MusicPlayer, fs_scanner: &mut FsScanner) {
+pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, music_player: &MusicPlayer, fs_scanner: &mut FsScanner) {
     // Match arm for inputting text
     if ui_state.searching {
         handle_search_input(input, ui_state).await
@@ -52,17 +49,6 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
         if !ui_state.delete{
             // Match arm for everything else
             match input.code {
-                KeyCode::Char('d') => match ui_state.main_window_state.to_owned() {
-                    MainWindowState::SongFocus(s) => if !s.is_local() {
-                        let dl = downloader.clone();
-                        let _ = thread::spawn(move || {dl.download_song(s)});
-                    },
-                    MainWindowState::RecordFocus(r, _) => if !r.is_local(){
-                        let dl = downloader.clone();
-                        let _ = thread::spawn(move || {dl.download_album(r)});
-                    },
-                    _ => {}
-                },
                 KeyCode::Char('p') => match ui_state.main_window_state.to_owned() {
                     MainWindowState::SongFocus(s) => if s.is_local() {music_player.play_song(s, true)},
                     MainWindowState::RecordFocus(r, _) => if r.is_local() {music_player.play_album(r, true)},
@@ -279,29 +265,10 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, downlo
                 KeyCode::Enter => {
                     match ui_state.focus {
                         Focus::MainWindow => {
-                            match ui_state.main_window_state.clone() {
-                                MainWindowState::Results(r) => match ui_state.focused_result {
-                                    FocusedResult::Song(i) => {
-                                        ui_state.history.push_front(ui_state.main_window_state.to_owned());
-                                        ui_state.main_window_state = MainWindowState::SongFocus(Box::new(r.2.get(i).unwrap().clone()))
-                                    },
-                                    FocusedResult::Record(i) => {
-                                        ui_state.history.push_front(ui_state.main_window_state.to_owned());
-                                        ui_state.main_window_state = MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(&r.0.get(i).unwrap().data.id).await)), None)
-                                    },
-                                    FocusedResult::Artist(i) => {
-                                        ui_state.history.push_front(ui_state.main_window_state.to_owned());
-                                        ui_state.main_window_state = MainWindowState::ArtistFocus(Box::new(r.1.get(i).unwrap().releases(unique_releases(r.1.get(i).unwrap().clone().data.id).await)), None)
-                                    },
-                                    _ => {}
-                                },
+                            match ui_state.main_window_state.clone() { 
                                 MainWindowState::ArtistFocus(a, i) => if i.is_some() {
                                     ui_state.history.push_front(ui_state.main_window_state.to_owned());
-                                    if a.get_albums().get(i.unwrap()).unwrap().is_groups() {
-                                        ui_state.main_window_state = MainWindowState::RecordFocus(Box::new(AlbumWrapper::new(album_from_release_group_id(&a.get_albums().get(i.unwrap()).unwrap().get_id()).await)), None)
-                                    } else {
-                                        ui_state.main_window_state = MainWindowState::RecordFocus(a.get_albums().get(i.unwrap()).unwrap().to_owned(), None)
-                                    }
+                                    ui_state.main_window_state = MainWindowState::RecordFocus(a.get_albums().get(i.unwrap()).unwrap().to_owned(), None)
                                 },
                                 MainWindowState::RecordFocus(r, i) => if i.is_some() {
                                     ui_state.history.push_front(ui_state.main_window_state.to_owned());
@@ -377,7 +344,7 @@ async fn handle_search_input(input: KeyEvent, ui_state: &mut UiState) {
         }
         KeyCode::Enter => {
             ui_state.focus = Focus::MainWindow;
-            helpers::query_web(ui_state).await
+            ui_state.main_window_state = MainWindowState::Results((vec![], vec![], vec![]));
         },
         _ => {}
     }

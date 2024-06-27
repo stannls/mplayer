@@ -1,7 +1,5 @@
-pub mod download;
 pub mod fs;
 pub mod player;
-pub mod search;
 use std::path::PathBuf;
 
 use dyn_clone::DynClone;

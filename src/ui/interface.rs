@@ -2,12 +2,9 @@ use super::components::ToolbarType;
 use super::input::Event;
 use super::input::handle_input;
 use crate::api::Artist;
-use crate::api::download::bandcamp_downloader::BandcampDownloader;
 use crate::api::fs::FsScanner;
 use crate::api::player::MusicPlayer;
 use crate::api::{Song, Album};
-use crate::api::download::download_pool::DownloadPool;
-use crate::api::download::musify_downloader::MusifyDownloader;
 use crate::ui::{components, layout};
 use crossterm::event::EnableMouseCapture;
 use crossterm::event::{DisableMouseCapture, KeyEvent};
@@ -28,9 +25,8 @@ use std::io;
 use std::{io::Stdout, sync::mpsc::Receiver};
 use tui::{backend::CrosstermBackend, Terminal};
 use super::helpers;
+use crate::ui::components::EmtpyEntity;
 
-
-use crate::api::search::wrapper::{self, ArtistWrapper, SongWrapper, ReleaseGroupWrapper};
 
 #[derive(Clone)]
 pub(crate) struct UiState {
@@ -49,7 +45,7 @@ pub(crate) struct UiState {
 #[derive(Clone)]
 pub(crate) enum MainWindowState {
     Help,
-    Results((Vec<ReleaseGroupWrapper>, Vec<ArtistWrapper>, Vec<SongWrapper>)),
+    Results((Vec<()>, Vec<()>, Vec<()>)),
     SongFocus(Box<dyn Song +Send +Sync>),
     ArtistFocus(Box<dyn Artist + Send +Sync>, Option<usize>),
     RecordFocus(Box<dyn Album + Send + Sync>, Option<usize>),
@@ -124,9 +120,6 @@ pub fn restore_terminal(
 pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,rx: Receiver<Event<KeyEvent>>) {
     // Init for ui state and the downloader
     let mut ui_state = UiState::new();
-    let downloader = DownloadPool::new(4)
-        .add_downloader(MusifyDownloader::new())
-        .add_downloader(BandcampDownloader::new());
     let music_player = MusicPlayer::new();
     let mut fs_scanner = FsScanner::new();
     // Main UI render loop
@@ -197,13 +190,13 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                         // Calculates how many results can be rendered on the current screen
                         let displayable_results = result_layout[0].height as usize - 3;
                         // Song search results
-                        f.render_widget(components::build_result_box("[S]ong".to_string(), t.2, scroll_value.0, displayable_results), result_layout[0]);
+                        f.render_widget(components::build_result_box("[S]ong".to_string(), vec![EmtpyEntity{}], scroll_value.0, displayable_results), result_layout[0]);
                         // Record search results
-                        f.render_widget(components::build_result_box("[R]ecord".to_string(), t.0, scroll_value.1, displayable_results), result_layout[2]);
+                        f.render_widget(components::build_result_box("[R]ecord".to_string(), vec![EmtpyEntity{}], scroll_value.1, displayable_results), result_layout[2]);
                         // Artist search results
-                        f.render_widget(components::build_result_box("[A]rtist".to_string(), t.1, scroll_value.2, displayable_results), result_layout[1]);
+                        f.render_widget(components::build_result_box("[A]rtist".to_string(), vec![EmtpyEntity{}], scroll_value.2, displayable_results), result_layout[1]);
                         // Playlsist search results (Not implemented)
-                        f.render_widget(components::build_result_box::<wrapper::ArtistWrapper>("[P]laylist".to_string(), vec![], scroll_value.3, displayable_results), result_layout[3]);
+                        f.render_widget(components::build_result_box("[P]laylist".to_string(), vec![EmtpyEntity{}], scroll_value.3, displayable_results), result_layout[3]);
                     }
                 }
 
@@ -237,7 +230,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 
         // Handles keyboard input
         match rx.recv().unwrap() {
-            Event::Input(event) => handle_input(event, &mut ui_state, &downloader, &music_player, &mut fs_scanner).await,
+            Event::Input(event) => handle_input(event, &mut ui_state, &music_player, &mut fs_scanner).await,
             _ => {}
         }
     }
