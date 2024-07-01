@@ -7,8 +7,6 @@ edition = "2021"
 
 [dependencies]
 crossterm = "0.26.1"
-musicbrainz_rs = "0.5.0"
-reqwest = {version = "0.11.14", features = ["blocking"]}
 tokio = {version = "1.26.0", features = ["full"]}
 tui = {package = "ratatui", version = "0.20.1"}
 chrono = "0.4.24"
@@ -21,7 +19,6 @@ dirs = "5.0.0"
 dyn-clone = "1.0.11"
 mp3-duration = "0.1.10"
 rodio = "0.17.3"
-scraper = "0.16.0"
 gjson = "0.8.1"
 markup5ever = "0.11.0"
 string_cache = "0.8.4"
