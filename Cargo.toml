@@ -10,7 +10,7 @@ crossterm = "0.26.1"
 tokio = {version = "1.26.0", features = ["full"]}
 tui = {package = "ratatui", version = "0.20.1"}
 chrono = "0.4.24"
-serde = "1.0.158"
+serde = {version = "1.0.158", features = ["derive"]}
 regex = "1.7.2"
 async-trait = "0.1.67"
 threadpool = "1.8.1"

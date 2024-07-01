@@ -13,7 +13,7 @@ use chrono::Duration;
 use dirs::{audio_dir, cache_dir};
 use itertools::Itertools;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 
 #[derive(Clone)]
 pub struct MusicRepository {
