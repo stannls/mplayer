@@ -2,7 +2,7 @@ use super::components::ToolbarType;
 use super::input::Event;
 use super::input::handle_input;
 use crate::api::Artist;
-use crate::api::fs::FsScanner;
+use crate::api::fs::MusicRepository;
 use crate::api::player::MusicPlayer;
 use crate::api::{Song, Album};
 use crate::ui::{components, layout};
@@ -121,7 +121,10 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     // Init for ui state and the downloader
     let mut ui_state = UiState::new();
     let music_player = MusicPlayer::new();
-    let mut fs_scanner = FsScanner::new();
+    let music_dir = dirs::audio_dir().unwrap();
+    let mut music_repository = MusicRepository::new(music_dir);
+    let _ = music_repository.load_cached_artists();
+    music_repository.watch_files();
     // Main UI render loop
     while !ui_state.quit {
         terminal
@@ -208,7 +211,7 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
                     f.render_widget(song_info, play_layout[0]);
                     f.render_widget(components::build_progress_bar(&current_song), play_layout[1])
                 }
-                ui_state.artists = fs_scanner.get_artists();
+                ui_state.artists = music_repository.get_artists();
                 if ui_state.delete {
                     let text = vec![
                         Spans::from(vec![
@@ -230,10 +233,11 @@ pub async fn render_interface(terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 
         // Handles keyboard input
         match rx.recv().unwrap() {
-            Event::Input(event) => handle_input(event, &mut ui_state, &music_player, &mut fs_scanner).await,
+            Event::Input(event) => handle_input(event, &mut ui_state, &music_player, &mut music_repository).await,
             _ => {}
         }
     }
+    let _ = music_repository.cache_artists();
 }
 
 

@@ -3,7 +3,7 @@ use crossterm::event::{self, KeyEvent, KeyCode};
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
-use crate::api::fs::{find_current_album, FsScanner};
+use crate::api::fs::{find_current_album, MusicRepository};
 use crate::api::player::MusicPlayer;
 use crate::ui::helpers;
 use super::interface::{UiState, MainWindowState, FocusedResult, SideMenu, Focus};
@@ -41,7 +41,7 @@ pub fn create_input_channel() -> Receiver<Event<KeyEvent>> {
     rx
 }
 
-pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, music_player: &MusicPlayer, fs_scanner: &mut FsScanner) {
+pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, music_player: &MusicPlayer, music_repository: &mut MusicRepository) {
     // Match arm for inputting text
     if ui_state.searching {
         handle_search_input(input, ui_state).await
@@ -303,21 +303,21 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, music_
                             thread::spawn(move || {
                                 new_s.delete();
                             });
-                            fs_scanner.remove_song(s);
+                            music_repository.remove_song(s);
                         },
                         MainWindowState::RecordFocus(r, _) => {
                             let new_r = r.to_owned();
                             thread::spawn(move || {
                                 new_r.delete();
                             });
-                            fs_scanner.remove_album(r);
+                            music_repository.remove_album(r);
                         },
                         MainWindowState::ArtistFocus(a, _) => {
                             let new_a = a.to_owned();
                             thread::spawn(move || {
                                 new_a.delete();
                             });
-                            fs_scanner.remove_artist(a);
+                            music_repository.remove_artist(a);
                         },
                         _ => {}
                     }
