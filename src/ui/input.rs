@@ -7,12 +7,7 @@ use crate::ui::helpers;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
-use crate::api::fs::{find_current_album, FsScanner};
-use crate::api::player::MusicPlayer;
-use crate::ui::helpers;
-use super::interface::{UiState, MainWindowState, FocusedResult, SideMenu, Focus};
 use std::thread;
-use std::time::{Duration, Instant};
 
 pub enum Event<I> {
     Input(I),
@@ -339,50 +334,6 @@ pub(crate) async fn handle_input(
                         },
                         Focus::None => {}
                     }
-                }
-                KeyCode::Enter => match ui_state.focus {
-                    Focus::MainWindow => match ui_state.main_window_state.clone() {
-                        MainWindowState::ArtistFocus(a, i) => {
-                            if i.is_some() {
-                                ui_state
-                                    .history
-                                    .push_front(ui_state.main_window_state.to_owned());
-                                ui_state.main_window_state = MainWindowState::RecordFocus(
-                                    a.get_albums().get(i.unwrap()).unwrap().to_owned(),
-                                    None,
-                                )
-                            }
-                        }
-                        MainWindowState::RecordFocus(r, i) => {
-                            if i.is_some() {
-                                ui_state
-                                    .history
-                                    .push_front(ui_state.main_window_state.to_owned());
-                                ui_state.main_window_state = MainWindowState::SongFocus(
-                                    r.get_songs().get(i.unwrap()).unwrap().to_owned(),
-                                )
-                            }
-                        }
-                        _ => {}
-                    },
-                    Focus::SideWindow => match ui_state.side_menu {
-                        SideMenu::Libary(i) => {
-                            if i.is_some() {
-                                ui_state
-                                    .history
-                                    .push_front(ui_state.main_window_state.to_owned());
-                                ui_state.focus = Focus::MainWindow;
-                                ui_state.side_menu = SideMenu::Libary(None);
-                                ui_state.main_window_state = MainWindowState::ArtistFocus(
-                                    ui_state.artists.get(i.unwrap()).unwrap().to_owned(),
-                                    None,
-                                );
-                            }
-                        }
-                        SideMenu::Queue(_) => {}
-                        SideMenu::None => {}
-                    },
-                    Focus::None => {}
                 },
                 _ => {}
             }
