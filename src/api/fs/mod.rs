@@ -434,7 +434,7 @@ impl FsSong {
                 .as_millis() as f64,
             number: tags.track_number()?,
             album_name: tags.album_title().unwrap_or("").to_string(),
-            release_data: tags.year().unwrap_or(0).to_string(),
+            release_data: if tags.date().is_none() {"0".to_string()} else {tags.date().unwrap().year.to_string()},
         })
     }
     pub fn fastnew(
