@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, DirEntry, File},
+    fs::{self, File},
     io::{self, Cursor, Read},
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -10,13 +10,244 @@ use super::{Album, Artist, Deleteable, Song};
 use crate::api::player::SongInfo;
 use audiotags::Tag;
 use chrono::Duration;
-use dirs::{audio_dir, cache_dir};
+use dirs::cache_dir;
 use itertools::Itertools;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-pub struct FsScanner {
-    artists: Arc<Mutex<Option<Vec<Box<dyn Artist + Send + Sync>>>>>,
+#[derive(Clone)]
+pub struct MusicRepository {
+    path: PathBuf,
+    artists: Arc<Mutex<Vec<Box<dyn Artist + Send + Sync>>>>,
+}
+
+impl MusicRepository {
+    pub fn new(path: PathBuf) -> MusicRepository {
+        MusicRepository {
+            path,
+            artists: Arc::new(Mutex::new(vec![])),
+        }
+    }
+    fn scan_repository(path: PathBuf) -> Vec<Box<dyn Artist + Send + Sync>> {
+        let files = depth_first_search_files(vec![path]);
+        files
+            .into_iter()
+            // Convert filesystem path into song struct containing metadata
+            .map(|f| FsSong::new(f))
+            // Ignore invalid files and convert valid ones into Song trait
+            .filter(|f| f.is_some())
+            .map(|f| Box::new(f.unwrap()) as Box<dyn Song + Send + Sync>)
+            // Group the songs by their album name
+            .group_by(|f| f.get_album_name())
+            .into_iter()
+            // Create an FsAlbum from the grouped song and convert it into an Album trait
+            .map(|f| Box::new(FsAlbum::new(f.1.collect_vec())) as Box<dyn Album + Send + Sync>)
+            // Group the albums by the album artist name
+            .group_by(|f| f.get_songs()[0].get_artist_name())
+            .into_iter()
+            // Create an FsArtist from the grouped albums and convert it into an Artist trait
+            .map(|f| {
+                Box::new(FsArtist::new_2(f.1.collect_vec(), f.0)) as Box<dyn Artist + Send + Sync>
+            })
+            .sorted_by_key(|a| a.get_name().to_lowercase())
+            .collect_vec()
+    }
+    pub fn remove_artist(&mut self, artist: Box<dyn Artist + Send + Sync>) {
+        let cloned = self.clone();
+        let mut artists = cloned.artists.lock().unwrap();
+        // Search index of the artist to be removed
+        let index = artists
+            .iter()
+            .position(|x| *x.get_name() == artist.get_name())
+            .unwrap();
+        // Remove the artist
+        let mut new_artists = artists.to_owned();
+        new_artists.remove(index);
+        *artists = new_artists;
+        // Force to repopulate cache
+        let _ = self.cache_artists();
+    }
+    pub fn remove_album(&mut self, album: Box<dyn Album + Send + Sync>) {
+        let cloned = self.clone();
+        let mut artists = cloned.artists.lock().unwrap();
+        let artist_index = artists
+            .iter()
+            .position(|x| *x.get_name() == album.get_songs().get(0).unwrap().get_artist_name())
+            .unwrap();
+
+        let artist = artists.get(artist_index).unwrap();
+
+        let new_artist = Box::new(FsArtist::new_2(
+            artist
+                .get_albums()
+                .iter()
+                .filter(|x| x.get_name() != album.get_name())
+                .map(|f| f.to_owned())
+                .collect(),
+            artist.get_name(),
+        )) as Box<dyn Artist + Send + Sync>;
+
+        let mut new_artists = artists.to_owned();
+        new_artists[artist_index] = new_artist;
+        *artists = new_artists;
+        let _ = self.cache_artists();
+    }
+    pub fn remove_song(&mut self, song: Box<dyn Song + Send + Sync>) {
+        let cloned = self.clone();
+        let mut artists = cloned.artists.lock().unwrap();
+        let artist_index = artists
+            .iter()
+            .position(|x| *x.get_name() == song.get_artist_name())
+            .unwrap();
+
+        let artist = artists.get(artist_index).unwrap();
+        let album_index = artist
+            .get_albums()
+            .iter()
+            .position(|x| *x.get_name() == song.get_album_name())
+            .unwrap();
+
+        let new_songs = artist
+            .get_albums()
+            .get(album_index)
+            .unwrap()
+            .get_songs()
+            .iter()
+            .filter(|x| x.get_title() != song.get_title())
+            .map(|f| f.to_owned())
+            .collect();
+
+        let new_album = Box::new(FsAlbum::new(new_songs)) as Box<dyn Album + Send + Sync>;
+        let mut new_albums = artist.get_albums();
+        new_albums[album_index] = new_album;
+        let new_artist = Box::new(FsArtist::new_2(new_albums, artist.get_name()));
+        let mut new_artists = artists.to_owned();
+        new_artists[artist_index] = new_artist;
+        *artists = new_artists;
+        let _ = self.cache_artists();
+    }
+    pub fn get_artists(&mut self) -> Vec<Box<dyn Artist + Send + Sync>> {
+        self.artists.lock().unwrap().clone()
+    }
+    pub fn cache_artists(&mut self) -> Result<(), io::Error> {
+        let artists = self.artists.lock().unwrap().clone();
+
+        let data = serde_json::to_string(
+            &artists
+                .into_iter()
+                .map(|f| SaveableArtist {
+                    name: f.get_name(),
+                    albums: f
+                        .get_albums()
+                        .into_iter()
+                        .map(|f| SaveableAlbum {
+                            name: f.get_name(),
+                            songs: f
+                                .get_songs()
+                                .into_iter()
+                                .filter(|f| f.get_filepath().is_some())
+                                .map(|f| SaveableSong {
+                                    path: f.get_filepath().unwrap(),
+                                    title: f.get_title(),
+                                    length: time_to_millis(
+                                        f.get_length().unwrap_or("00:00".to_string()),
+                                    )
+                                    .unwrap_or(0 as f64),
+                                    number: f
+                                        .get_number()
+                                        .unwrap_or("0".to_string())
+                                        .parse()
+                                        .unwrap_or(0),
+                                    release_data: f.get_release_date().unwrap_or("0".to_string()),
+                                    album_name: f.get_album_name(),
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                })
+                .collect::<Vec<SaveableArtist>>(),
+        )?;
+
+        let mut path = cache_dir().ok_or(io::Error::new(
+            io::ErrorKind::Other,
+            "Failed to find config dir",
+        ))?;
+        path.push("mplayer");
+        fs::create_dir_all(&path)?;
+        path.push("artist_cache");
+        let mut file = File::create(&path)?;
+        let mut content = Cursor::new(data);
+        io::copy(&mut content, &mut file)?;
+        Ok(())
+    }
+    pub fn load_cached_artists(&mut self) -> Result<(), io::Error> {
+        let mut path = cache_dir().ok_or(io::Error::new(
+            io::ErrorKind::Other,
+            "Failed to find config dir",
+        ))?;
+        path.push("mplayer");
+        path.push("artist_cache");
+
+        let mut file = File::open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+
+        let cached_artists: Vec<SaveableArtist> = serde_json::from_str(&contents)?;
+        let artists = cached_artists
+            .into_iter()
+            .map(|f| {
+                Box::new(FsArtist::new_2(
+                    f.albums
+                        .into_iter()
+                        .map(|f| {
+                            Box::new(FsAlbum::new(
+                                f.songs
+                                    .into_iter()
+                                    .map(|f| {
+                                        Box::new(FsSong::fastnew(
+                                            f.path,
+                                            f.title,
+                                            f.length,
+                                            f.number,
+                                            f.album_name,
+                                            f.release_data,
+                                        ))
+                                            as Box<dyn Song + Send + Sync>
+                                    })
+                                    .collect(),
+                            )) as Box<dyn Album + Send + Sync>
+                        })
+                        .collect(),
+                    f.name,
+                )) as Box<dyn Artist + Send + Sync>
+            })
+            .collect();
+        let mut guard = self.artists.lock().unwrap();
+        *guard = artists;
+        Ok(())
+    }
+    pub fn watch_files(&self) {
+        let artists = self.artists.clone();
+        let path = self.path.clone();
+        thread::spawn(move || loop {
+            let scanned_artists = MusicRepository::scan_repository(path.to_owned());
+            let mut artist_lock = artists.lock().unwrap();
+            *artist_lock = scanned_artists;
+        });
+    }
+    pub fn find_current_album(&self, song_info: &SongInfo) -> Option<Box<dyn Album + Send + Sync>> {
+        self.artists
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|artist| artist.get_name() == song_info.artist)
+            .nth(0)?
+            .get_albums()
+            .iter()
+            .filter(|album| album.get_name() == song_info.album)
+            .nth(0)
+            .map(|val| val.to_owned())
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -47,254 +278,15 @@ pub fn time_to_millis(time: String) -> Option<f64> {
     Some(captures[1].parse::<f64>().ok()? * 60000.0 + captures[2].parse::<f64>().ok()? * 1000.0)
 }
 
-impl FsScanner {
-    pub fn new() -> FsScanner {
-        let artists =
-            Arc::new(Mutex::new(None)) as Arc<Mutex<Option<Vec<Box<dyn Artist + Sync + Send>>>>>;
-        FsScanner::start(artists.to_owned());
-        FsScanner { artists }
-    }
-    pub fn remove_artist(&mut self, artist: Box<dyn Artist + Send + Sync>) {
-        let artists = self.artists.clone();
-        thread::spawn(move || {
-            let mut artists = artists.lock().unwrap();
-            match artists.to_owned() {
-                Some(a) => {
-                    let index = a
-                        .iter()
-                        .position(|x| *x.get_name() == artist.get_name())
-                        .unwrap();
-                    let mut new_artists = artists.to_owned().unwrap();
-                    new_artists.remove(index);
-                    *artists = Some(new_artists);
-                    let _ = FsScanner::cache_artists(artists.to_owned().unwrap());
-                }
-                None => {}
-            }
-        });
-    }
-    pub fn remove_album(&mut self, album: Box<dyn Album + Send + Sync>) {
-        let artists = self.artists.clone();
-        thread::spawn(move || {
-            let mut artists = artists.lock().unwrap();
-            match artists.to_owned() {
-                Some(a) => {
-                    let artist_index = a
-                        .iter()
-                        .position(|x| {
-                            *x.get_name() == album.get_songs().get(0).unwrap().get_artist_name()
-                        })
-                        .unwrap();
-                    let artist = a.get(artist_index).unwrap();
-                    let new_artist = Box::new(FsArtist::new_2(
-                        artist
-                            .get_albums()
-                            .iter()
-                            .filter(|x| x.get_name() != album.get_name())
-                            .map(|f| f.to_owned())
-                            .collect(),
-                        artist.get_name(),
-                    )) as Box<dyn Artist + Send + Sync>;
-                    let mut new_artists = a.to_owned();
-                    new_artists[artist_index] = new_artist;
-                    *artists = Some(new_artists);
-                    let _ = FsScanner::cache_artists(artists.to_owned().unwrap());
-                }
-                None => {}
-            }
-        });
-    }
-    pub fn remove_song(&mut self, song: Box<dyn Song + Send + Sync>) {
-        let artists = self.artists.clone();
-        thread::spawn(move || {
-            let mut artists = artists.lock().unwrap();
-            match artists.to_owned() {
-                Some(a) => {
-                    let artist_index = a
-                        .iter()
-                        .position(|x| *x.get_name() == song.get_artist_name())
-                        .unwrap();
-                    let artist = a.get(artist_index).unwrap();
-                    let album_index = artist
-                        .get_albums()
-                        .iter()
-                        .position(|x| *x.get_name() == song.get_album_name())
-                        .unwrap();
-                    let new_songs = artist
-                        .get_albums()
-                        .get(album_index)
-                        .unwrap()
-                        .get_songs()
-                        .iter()
-                        .filter(|x| x.get_title() != song.get_title())
-                        .map(|f| f.to_owned())
-                        .collect();
-                    let new_album =
-                        Box::new(FsAlbum::new_2(new_songs)) as Box<dyn Album + Send + Sync>;
-                    let mut new_albums = artist.get_albums();
-                    new_albums[album_index] = new_album;
-                    let new_artist = Box::new(FsArtist::new_2(new_albums, artist.get_name()));
-                    let mut new_artists = a.to_owned();
-                    new_artists[artist_index] = new_artist;
-                    *artists = Some(new_artists);
-                    let _ = FsScanner::cache_artists(artists.to_owned().unwrap());
-                }
-                None => {}
-            }
-        });
-    }
-    fn start(artists: Arc<Mutex<Option<Vec<Box<dyn Artist + Sync + Send>>>>>) {
-        std::thread::spawn(move || {
-            let mut guard = artists.lock().unwrap();
-            *guard = FsScanner::load_cached_artists().ok();
-            drop(guard);
-            loop {
-                let scanned_artists = FsScanner::scan_files();
-                let mut old_artists = artists.lock().unwrap();
-                *old_artists = Some(scanned_artists.to_owned());
-                let _ = FsScanner::cache_artists(scanned_artists);
-            }
-        });
-    }
-    pub fn get_artists(&mut self) -> Vec<Box<dyn Artist + Send + Sync>> {
-        let artists = self.artists.lock().unwrap().to_owned();
-        artists.unwrap_or(vec![])
-    }
-    fn scan_files() -> Vec<Box<dyn Artist + Send + Sync>> {
-        let mut dir = audio_dir().unwrap();
-        dir.push("mplayer");
-
-        let mut artists = depth_first_search_files(
-            fs::read_dir(dir)
-                .unwrap()
-                .filter(|f| f.is_ok())
-                .map(|f| f.unwrap())
-                .collect(),
-        )
-        .into_iter()
-        .map(|f| FsSong::new(f.path()))
-        .filter(|f| f.is_some())
-        .map(|f| Box::new(f.unwrap()) as Box<dyn Song + Send + Sync>)
-        .group_by(|f| f.get_album_name())
-        .into_iter()
-        .map(|f| Box::new(FsAlbum::new_2(f.1.collect_vec())) as Box<dyn Album + Send + Sync>)
-        .group_by(|f| f.get_songs()[0].get_artist_name())
-        .into_iter()
-        .map(|f| Box::new(FsArtist::new_2(f.1.collect_vec(), f.0)) as Box<dyn Artist + Send + Sync>)
-        .collect_vec();
-        artists.sort_by_key(|a| a.get_name().to_lowercase());
-
-        artists
-    }
-    fn artists_to_json(artists: Option<Vec<Box<dyn Artist + Send + Sync>>>) -> Option<String> {
-        match artists {
-            Some(f) => serde_json::to_string(
-                &f.into_iter()
-                    .map(|f| SaveableArtist {
-                        name: f.get_name(),
-                        albums: f
-                            .get_albums()
-                            .into_iter()
-                            .map(|f| SaveableAlbum {
-                                name: f.get_name(),
-                                songs: f
-                                    .get_songs()
-                                    .into_iter()
-                                    .filter(|f| f.get_filepath().is_some())
-                                    .map(|f| SaveableSong {
-                                        path: f.get_filepath().unwrap(),
-                                        title: f.get_title(),
-                                        length: time_to_millis(
-                                            f.get_length().unwrap_or("00:00".to_string()),
-                                        )
-                                        .unwrap_or(0 as f64),
-                                        number: f
-                                            .get_number()
-                                            .unwrap_or("0".to_string())
-                                            .parse()
-                                            .unwrap_or(0),
-                                        release_data: f
-                                            .get_release_date()
-                                            .unwrap_or("0".to_string()),
-                                        album_name: f.get_album_name(),
-                                    })
-                                    .collect(),
-                            })
-                            .collect(),
-                    })
-                    .collect::<Vec<SaveableArtist>>(),
-            )
-            .ok(),
-            _ => None,
-        }
-    }
-    pub fn cache_artists(artists: Vec<Box<dyn Artist + Send + Sync>>) -> Result<(), io::Error> {
-        let data = FsScanner::artists_to_json(Some(artists)).unwrap();
-        let mut path = cache_dir().ok_or(io::Error::new(
-            io::ErrorKind::Other,
-            "Failed to find config dir",
-        ))?;
-        path.push("mplayer");
-        fs::create_dir_all(&path)?;
-        path.push("artist_cache");
-        let mut file = File::create(&path)?;
-        let mut content = Cursor::new(data);
-        io::copy(&mut content, &mut file)?;
-        Ok(())
-    }
-    fn load_cached_artists() -> Result<Vec<Box<dyn Artist + Send + Sync>>, io::Error> {
-        let mut path = cache_dir().ok_or(io::Error::new(
-            io::ErrorKind::Other,
-            "Failed to find config dir",
-        ))?;
-        path.push("mplayer");
-        path.push("artist_cache");
-        let mut file = File::open(path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        let cached_artists: Vec<SaveableArtist> = serde_json::from_str(&contents)?;
-        Ok(cached_artists
-            .into_iter()
-            .map(|f| {
-                Box::new(FsArtist::new_2(
-                    f.albums
-                        .into_iter()
-                        .map(|f| {
-                            Box::new(FsAlbum::new_2(
-                                f.songs
-                                    .into_iter()
-                                    .map(|f| {
-                                        Box::new(FsSong::fastnew(
-                                            f.path,
-                                            f.title,
-                                            f.length,
-                                            f.number,
-                                            f.album_name,
-                                            f.release_data,
-                                        ))
-                                            as Box<dyn Song + Send + Sync>
-                                    })
-                                    .collect(),
-                            )) as Box<dyn Album + Send + Sync>
-                        })
-                        .collect(),
-                    f.name,
-                )) as Box<dyn Artist + Send + Sync>
-            })
-            .collect())
-    }
-}
-
-fn depth_first_search_files(files: Vec<DirEntry>) -> Vec<DirEntry> {
+fn depth_first_search_files(files: Vec<PathBuf>) -> Vec<PathBuf> {
     files
         .into_iter()
         .flat_map(|f| {
-            if f.file_type().unwrap().is_dir() {
+            if f.is_dir() {
                 depth_first_search_files(
-                    fs::read_dir(f.path())
+                    fs::read_dir(&f)
                         .unwrap()
-                        .filter(|f| f.is_ok())
-                        .map(|f| f.unwrap())
+                        .map(|d| d.unwrap().path())
                         .collect(),
                 )
             } else {
@@ -344,26 +336,7 @@ pub struct FsAlbum {
 }
 
 impl FsAlbum {
-    pub fn new(path: PathBuf) -> Option<FsAlbum> {
-        let mut songs: Vec<Box<dyn super::Song + Send + Sync>> = fs::read_dir(path.to_owned())
-            .unwrap()
-            .into_iter()
-            .map(|f| {
-                Box::new(FsSong::new(f.unwrap().path()).unwrap()) as Box<dyn Song + Send + Sync>
-            })
-            .collect();
-        songs.sort_by(|a, b| {
-            a.get_number()
-                .unwrap()
-                .parse::<isize>()
-                .unwrap()
-                .partial_cmp(&b.get_number().unwrap().parse::<isize>().unwrap())
-                .unwrap()
-        });
-
-        Some(FsAlbum { songs })
-    }
-    pub fn new_2(mut songs: Vec<Box<dyn Song + Send + Sync>>) -> FsAlbum {
+    pub fn new(mut songs: Vec<Box<dyn Song + Send + Sync>>) -> FsAlbum {
         songs.sort_by(|a, b| {
             a.get_number()
                 .unwrap()
@@ -447,14 +420,19 @@ pub struct FsSong {
 
 impl FsSong {
     pub fn new(path: PathBuf) -> Option<FsSong> {
+        let extension = infer::get_from_path(path.to_owned()).ok()??.extension();
+        if !(extension == "mp3" || extension == "flac" || extension == "wav" || extension == "m4a")
+        {
+            return None;
+        }
         let tags = Tag::new().read_from_path(path.to_owned()).ok()?;
         Some(FsSong {
             path: path.to_owned(),
-            title: tags.title().unwrap().to_string(),
+            title: tags.title()?.to_string(),
             length: mp3_duration::from_path(&path)
                 .unwrap_or(std::time::Duration::from_secs(0))
                 .as_millis() as f64,
-            number: tags.track_number().unwrap(),
+            number: tags.track_number()?,
             album_name: tags.album_title().unwrap_or("").to_string(),
             release_data: tags.year().unwrap_or(0).to_string(),
         })
@@ -541,26 +519,4 @@ impl Deleteable for FsSong {
     fn delete(&self) {
         let _ = fs::remove_file(&self.path);
     }
-}
-
-// Tries to find the album of the given song in the local files
-pub fn find_current_album(song_info: &SongInfo) -> Option<Box<dyn Album + Send + Sync>> {
-    let mut dir = audio_dir().unwrap();
-    dir.push("mplayer");
-    let artists = fs::read_dir(dir.clone())
-        .unwrap()
-        .into_iter()
-        .filter(|f| f.is_ok())
-        .map(|f| f.unwrap())
-        .filter(|f| f.file_name().into_string().unwrap() == song_info.artist)
-        .collect::<Vec<DirEntry>>();
-    dir.push(artists.get(0)?.file_name());
-    let albums = fs::read_dir(dir.clone())
-        .unwrap()
-        .into_iter()
-        .filter(|f| f.is_ok())
-        .map(|f| f.unwrap())
-        .filter(|f| f.file_name().into_string().unwrap() == song_info.album)
-        .collect::<Vec<DirEntry>>();
-    Some(Box::new(FsAlbum::new(albums.get(0)?.path())?))
 }

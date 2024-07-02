@@ -1,12 +1,9 @@
-#![feature(async_closure)]
 mod api;
 mod ui;
 
+use rodio::{OutputStream, Sink};
 use ui::interface;
 use ui::{input::create_input_channel, interface::setup_terminal};
-use rodio::{Sink, OutputStream};
-
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
