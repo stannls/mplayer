@@ -38,12 +38,12 @@ impl MusicRepository {
             .filter(|f| f.is_some())
             .map(|f| Box::new(f.unwrap()) as Box<dyn Song + Send + Sync>)
             // Group the songs by their album name
-            .group_by(|f| f.get_album_name())
+            .chunk_by(|f| f.get_album_name())
             .into_iter()
             // Create an FsAlbum from the grouped song and convert it into an Album trait
             .map(|f| Box::new(FsAlbum::new(f.1.unique_by(|song| song.get_title()).collect_vec())) as Box<dyn Album + Send + Sync>)
             // Group the albums by the album artist name
-            .group_by(|f| f.get_songs()[0].get_artist_name())
+            .chunk_by(|f| f.get_songs()[0].get_artist_name())
             .into_iter()
             // Create an FsArtist from the grouped albums and convert it into an Artist trait
             .map(|f| {
