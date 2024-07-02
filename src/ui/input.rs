@@ -3,7 +3,7 @@ use crossterm::event::{self, KeyEvent, KeyCode};
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
-use crate::api::fs::{find_current_album, MusicRepository};
+use crate::api::fs::MusicRepository;
 use crate::api::player::MusicPlayer;
 use crate::ui::helpers;
 use super::interface::{UiState, MainWindowState, FocusedResult, SideMenu, Focus};
@@ -92,7 +92,7 @@ pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState, music_
                 KeyCode::Char('c') => {
                     let song_info = music_player.get_song_info();
                     if song_info.is_some() {
-                        let current_album = find_current_album(&song_info.unwrap());
+                        let current_album = music_repository.find_current_album(&song_info.unwrap());
                         if current_album.is_some() {
                             ui_state.main_window_state = MainWindowState::RecordFocus(current_album.unwrap(), None);
                         }

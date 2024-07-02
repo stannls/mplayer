@@ -203,7 +203,15 @@ impl MusicRepository {
             }
         });
     }
-
+    pub fn find_current_album(&self, song_info: &SongInfo) -> Option<Box<dyn Album + Send + Sync>> {
+       self.artists.lock().unwrap().iter()
+           .filter(|artist| artist.get_name() == song_info.artist)
+           .nth(0)?
+           .get_albums().iter()
+           .filter(|album| album.get_name() == song_info.album)
+           .nth(0)
+           .map(|val| val.to_owned())
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -486,23 +494,3 @@ impl Deleteable for FsSong {
     }
 }
 
-// Tries to find the album of the given song in the local files
-pub fn find_current_album(song_info: &SongInfo) -> Option<Box<dyn Album + Send + Sync>> {
-    let mut dir = audio_dir().unwrap();
-    let artists = fs::read_dir(dir.clone())
-        .unwrap()
-        .into_iter()
-        .filter(|f| f.is_ok())
-        .map(|f| f.unwrap())
-        .filter(|f| f.file_name().into_string().unwrap() == song_info.artist)
-        .collect::<Vec<DirEntry>>();
-    dir.push(artists.get(0)?.file_name());
-    let albums = fs::read_dir(dir.clone())
-        .unwrap()
-        .into_iter()
-        .filter(|f| f.is_ok())
-        .map(|f| f.unwrap())
-        .filter(|f| f.file_name().into_string().unwrap() == song_info.album)
-        .collect::<Vec<DirEntry>>();
-    Some(Box::new(FsAlbum::new(albums.get(0)?.path())?))
-}
