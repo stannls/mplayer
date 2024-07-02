@@ -11,6 +11,7 @@ use crate::api::player::SongInfo;
 use audiotags::Tag;
 use chrono::Duration;
 use dirs::{audio_dir, cache_dir};
+use infer::Infer;
 use itertools::Itertools;
 use regex::Regex;
 use serde::{Serialize, Deserialize};
@@ -26,15 +27,10 @@ impl MusicRepository {
         MusicRepository { path, artists: Arc::new(Mutex::new(vec![])) }
     }
     fn scan_repository(path: PathBuf) -> Vec<Box<dyn Artist + Send + Sync>> {
-        let valid_children = fs::read_dir(&path).unwrap()
-            .filter(|f| f.is_ok())
-            .map(|f| f.unwrap())
-            .collect();
-
-        let files = depth_first_search_files(valid_children);
+        let files = depth_first_search_files(vec![path]);
         files.into_iter()
             // Convert filesystem path into song struct containing metadata
-            .map(|f| FsSong::new(f.path()))
+            .map(|f| FsSong::new(f))
             // Ignore invalid files and convert valid ones into Song trait
             .filter(|f| f.is_some())
             .map(|f| Box::new(f.unwrap()) as Box<dyn Song + Send + Sync>)
@@ -238,23 +234,13 @@ pub fn time_to_millis(time: String) -> Option<f64> {
     Some(captures[1].parse::<f64>().ok()? * 60000.0 + captures[2].parse::<f64>().ok()? * 1000.0)
 }
 
-fn depth_first_search_files(files: Vec<DirEntry>) -> Vec<DirEntry> {
-    files
-        .into_iter()
-        .flat_map(|f| {
-            if f.file_type().unwrap().is_dir() {
-                depth_first_search_files(
-                    fs::read_dir(f.path())
-                        .unwrap()
-                        .filter(|f| f.is_ok())
-                        .map(|f| f.unwrap())
-                        .collect(),
-                )
-            } else {
-                vec![f]
-            }
-        })
-        .collect()
+fn depth_first_search_files(files: Vec<PathBuf>) -> Vec<PathBuf> {
+    files.into_iter()
+        .flat_map(|f| if f.is_dir() {
+            depth_first_search_files(fs::read_dir(&f).unwrap().map(|d| d.unwrap().path()).collect())
+        } else {
+            vec![f]
+        }).collect()
 }
 
 #[derive(Clone)]
@@ -400,14 +386,18 @@ pub struct FsSong {
 
 impl FsSong {
     pub fn new(path: PathBuf) -> Option<FsSong> {
+        let extension = infer::get_from_path(path.to_owned()).ok()??.extension();
+        if !(extension == "mp3" || extension == "flac" || extension == "wav" || extension == "m4a") {
+            return None;
+        }
         let tags = Tag::new().read_from_path(path.to_owned()).ok()?;
         Some(FsSong {
             path: path.to_owned(),
-            title: tags.title().unwrap().to_string(),
+            title: tags.title()?.to_string(),
             length: mp3_duration::from_path(&path)
                 .unwrap_or(std::time::Duration::from_secs(0))
                 .as_millis() as f64,
-            number: tags.track_number().unwrap(),
+            number: tags.track_number()?,
             album_name: tags.album_title().unwrap_or("").to_string(),
             release_data: tags.year().unwrap_or(0).to_string(),
         })
