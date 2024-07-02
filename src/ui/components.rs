@@ -97,7 +97,7 @@ pub trait SearchEntity {
     fn display(&self) -> String;
 }
 
-pub struct EmtpyEntity{}
+pub struct EmtpyEntity {}
 impl SearchEntity for EmtpyEntity {
     fn display(&self) -> String {
         "".to_string()
