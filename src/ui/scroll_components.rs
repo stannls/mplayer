@@ -52,7 +52,6 @@ impl ScrollTable {
         }
         if self.selected.is_some()
             && self.focused.is_some()
-            && self.selected.is_some()
             && self.focused.unwrap() == self.selected.unwrap()
             && self.focused.unwrap() < items.len()
         {
@@ -65,9 +64,9 @@ impl ScrollTable {
         }
         if self.displayable_results > 0
             && self.focused.is_some()
-            && self.focused.unwrap() + 1 > self.displayable_results
+            && self.focused.unwrap() > self.displayable_results
         {
-            items.drain(0..self.focused.unwrap() - self.displayable_results + 1);
+            items.drain(0..self.focused.unwrap() - self.displayable_results);
         }
         Table::new(items)
     }
