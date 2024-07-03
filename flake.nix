@@ -17,7 +17,7 @@
           buildInputs = with pkgs; [ openssl pkg-config alsa-lib ];
 		};
         devShell = with pkgs; mkShell {
-          buildInputs = [ cargo rustc rustfmt pre-commit rustPackages.clippy ];
+          buildInputs = [ cargo rustc rustfmt pre-commit rustPackages.clippy pkg-config alsa-lib openssl];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
         };
       }
