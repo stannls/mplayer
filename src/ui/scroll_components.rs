@@ -5,6 +5,7 @@ use tui::{
 
 pub struct ScrollTable {
     content: Vec<Vec<String>>,
+    content_range: (usize, usize),
     focused: Option<usize>,
     selected: Option<usize>,
     displayable_results: usize,
@@ -13,6 +14,7 @@ impl ScrollTable {
     pub fn new(content: Vec<Vec<String>>) -> ScrollTable {
         ScrollTable {
             content,
+            content_range: (0, 0),
             focused: None,
             selected: None,
             displayable_results: 0,
@@ -28,11 +30,17 @@ impl ScrollTable {
     }
     pub fn displayable_results(mut self, r: usize) -> ScrollTable {
         self.displayable_results = r;
+        if self.content_range.1 - self.content_range.0 > r {
+            self.content_range.1 = self.content_range.0 + r;
+        } else if self.content_range.1 - self.content_range.0 < r {
+            self.content_range.1 = self.content_range.0 + r;
+        }
         self
     }
-    pub fn render(self) -> Table<'static> {
+    pub fn render(&mut self) -> Table<'static> {
         let mut items = self
             .content
+            .clone()
             .into_iter()
             .map(|f| Row::new(f))
             .collect::<Vec<Row>>();
@@ -62,12 +70,15 @@ impl ScrollTable {
                         .add_modifier(Modifier::BOLD),
                 );
         }
-        if self.displayable_results > 0
-            && self.focused.is_some()
-            && self.focused.unwrap() > self.displayable_results
-        {
-            items.drain(0..self.focused.unwrap() - self.displayable_results);
+        // Check if the focused item is not fitting into the default display
+        if self.focused.is_some() && (self.focused.unwrap() < self.content_range.0 || self.focused.unwrap() > self.content_range.1) {
+            if self.focused.unwrap() < self.content_range.0 {
+                self.content_range = (self.focused.unwrap(), self.focused.unwrap() + self.displayable_results);
+            } else if self.focused.unwrap() > self.content_range.1 {
+                self.content_range = (self.focused.unwrap() - self.displayable_results, self.focused.unwrap());
+            }
         }
+        items.drain(0..self.content_range.0);
         Table::new(items)
     }
 }
