@@ -39,6 +39,8 @@ pub(crate) struct UiState {
     pub(crate) side_menu: SideMenu,
     pub(crate) focus: Focus,
     pub(crate) delete: bool,
+    pub(crate) music_player: MusicPlayer,
+    pub(crate) music_repository: MusicRepository,
 }
 
 #[derive(Clone)]
@@ -75,7 +77,7 @@ pub enum Focus {
 }
 
 impl UiState {
-    fn new() -> UiState {
+    fn new(music_player: MusicPlayer, music_repository: MusicRepository) -> UiState {
         UiState {
             searching: false,
             searchbar_content: String::from(""),
@@ -87,6 +89,8 @@ impl UiState {
             side_menu: SideMenu::Libary(None),
             focus: Focus::None,
             delete: false,
+            music_player,
+            music_repository,
         }
     }
 }
@@ -121,17 +125,20 @@ pub async fn render_interface(
     rx: Receiver<Event<KeyEvent>>,
 ) {
     // Init for ui state and the downloader
-    let mut ui_state = UiState::new();
     let music_player = MusicPlayer::new();
     let music_dir = dirs::audio_dir().unwrap();
     let mut music_repository = MusicRepository::new(music_dir);
-    let _ = music_repository.load_cached_artists();
+    
+    let _ = music_repository.load_cached_artists(); 
     music_repository.watch_files();
+
+    let mut ui_state = UiState::new(music_player, music_repository);
+
     // Main UI render loop
     while !ui_state.quit {
         terminal
             .draw(|f| {
-                let current_song = music_player.get_song_info();
+                let current_song = ui_state.music_player.get_song_info();
 
                 // Layouting
                 let size = f.size();
@@ -168,7 +175,7 @@ pub async fn render_interface(
                     ),
                     SideMenu::Queue(i) => f.render_widget(
                         components::build_queue(
-                            music_player.get_queue(),
+                            ui_state.music_player.get_queue(),
                             i,
                             content_layout[0].height as usize - 3,
                         ),
@@ -304,7 +311,7 @@ pub async fn render_interface(
                         play_layout[1],
                     )
                 }
-                ui_state.artists = music_repository.get_artists();
+                ui_state.artists = ui_state.music_repository.get_artists();
                 if ui_state.delete {
                     let text = vec![
                         Spans::from(vec![Span::raw(
@@ -331,10 +338,10 @@ pub async fn render_interface(
         // Handles keyboard input
         match rx.recv().unwrap() {
             Event::Input(event) => {
-                handle_input(event, &mut ui_state, &music_player, &mut music_repository).await
+                handle_input(event, &mut ui_state).await
             }
             _ => {}
         }
     }
-    let _ = music_repository.cache_artists();
+    let _ = ui_state.music_repository.cache_artists();
 }

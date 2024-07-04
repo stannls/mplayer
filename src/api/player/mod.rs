@@ -76,6 +76,7 @@ impl SongInfo {
     }
 }
 
+#[derive(Clone)]
 pub struct MusicPlayer {
     // These two need to be stored in the struct, because else they will go out of scope and the
     // sink will be unable to play

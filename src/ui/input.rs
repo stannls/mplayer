@@ -1,8 +1,6 @@
 use crossterm::event::{self, KeyCode, KeyEvent};
 
 use super::interface::{Focus, FocusedResult, MainWindowState, SideMenu, UiState};
-use crate::api::fs::MusicRepository;
-use crate::api::player::MusicPlayer;
 use crate::ui::helpers;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
@@ -40,12 +38,7 @@ pub fn create_input_channel() -> Receiver<Event<KeyEvent>> {
     rx
 }
 
-pub(crate) async fn handle_input(
-    input: KeyEvent,
-    ui_state: &mut UiState,
-    music_player: &MusicPlayer,
-    music_repository: &mut MusicRepository,
-) {
+pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState) {
     // Match arm for inputting text
     if ui_state.searching {
         handle_search_input(input, ui_state).await
@@ -56,12 +49,12 @@ pub(crate) async fn handle_input(
                 KeyCode::Char('p') => match ui_state.main_window_state.to_owned() {
                     MainWindowState::SongFocus(s) => {
                         if s.is_local() {
-                            music_player.play_song(s, true)
+                            ui_state.music_player.play_song(s, true)
                         }
                     }
                     MainWindowState::RecordFocus(r, _) => {
                         if r.is_local() {
-                            music_player.play_album(r, true)
+                            ui_state.music_player.play_album(r, true)
                         }
                     }
                     _ => {}
@@ -69,12 +62,12 @@ pub(crate) async fn handle_input(
                 KeyCode::Char('e') => match ui_state.main_window_state.to_owned() {
                     MainWindowState::SongFocus(s) => {
                         if s.is_local() {
-                            music_player.play_song(s, false)
+                            ui_state.music_player.play_song(s, false)
                         }
                     }
                     MainWindowState::RecordFocus(r, _) => {
                         if r.is_local() {
-                            music_player.play_album(r, false)
+                            ui_state.music_player.play_album(r, false)
                         }
                     }
                     _ => {}
@@ -97,21 +90,21 @@ pub(crate) async fn handle_input(
                     }
                     _ => {}
                 },
-                KeyCode::Char(' ') => music_player.pause(),
-                KeyCode::Char('n') => music_player.skip(),
-                KeyCode::Char('v') => music_player.stop(),
+                KeyCode::Char(' ') => ui_state.music_player.pause(),
+                KeyCode::Char('n') => ui_state.music_player.skip(),
+                KeyCode::Char('v') => ui_state.music_player.stop(),
                 KeyCode::Char('q') => ui_state.quit = true,
-                KeyCode::Char('+') => music_player.change_volume(0.1),
-                KeyCode::Char('-') => music_player.change_volume(-0.1),
+                KeyCode::Char('+') => ui_state.music_player.change_volume(0.1),
+                KeyCode::Char('-') => ui_state.music_player.change_volume(-0.1),
                 KeyCode::Char('h') => {
                     ui_state.main_window_state = MainWindowState::Help;
                     ui_state.focus = Focus::None
                 }
                 KeyCode::Char('c') => {
-                    let song_info = music_player.get_song_info();
+                    let song_info = ui_state.music_player.get_song_info();
                     if song_info.is_some() {
                         let current_album =
-                            music_repository.find_current_album(&song_info.unwrap());
+                            ui_state.music_repository.find_current_album(&song_info.unwrap());
                         if current_album.is_some() {
                             ui_state.main_window_state =
                                 MainWindowState::RecordFocus(current_album.unwrap(), None);
@@ -336,21 +329,21 @@ pub(crate) async fn handle_input(
                             thread::spawn(move || {
                                 new_s.delete();
                             });
-                            music_repository.remove_song(s);
+                            ui_state.music_repository.remove_song(s);
                         }
                         MainWindowState::RecordFocus(r, _) => {
                             let new_r = r.to_owned();
                             thread::spawn(move || {
                                 new_r.delete();
                             });
-                            music_repository.remove_album(r);
+                            ui_state.music_repository.remove_album(r);
                         }
                         MainWindowState::ArtistFocus(a, _) => {
                             let new_a = a.to_owned();
                             thread::spawn(move || {
                                 new_a.delete();
                             });
-                            music_repository.remove_artist(a);
+                            ui_state.music_repository.remove_artist(a);
                         }
                         _ => {}
                     }
