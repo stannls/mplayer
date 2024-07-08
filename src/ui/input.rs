@@ -1,7 +1,6 @@
 use crossterm::event::{self, KeyCode, KeyEvent};
 
 use super::interface::{Focus, FocusedResult, MainWindowState, SideMenu, UiState};
-use crate::ui::helpers;
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
@@ -28,7 +27,7 @@ impl InputHandler {
     pub fn handle(&self, input: KeyEvent, ui_state: &mut UiState) {
         self.handlers.iter().for_each(|handler| handler.handle(input, ui_state))
     }
-    pub fn load_input_handlers(mut self) -> InputHandler {
+    pub fn load_input_handlers(self) -> InputHandler {
         let main_input_handler = ConditionalHandler::new(|ui_state| !ui_state.searching && !ui_state.delete)
             .register_handler(KeyCode::Char('p'), |ui_state| match ui_state.main_window_state.to_owned() {
                 MainWindowState::SongFocus(song) => ui_state.music_player.play_song(song, true),
@@ -110,15 +109,37 @@ impl InputHandler {
             ui_state.main_window_state = ui_state.history.pop_front().unwrap();
         }).unwrap() 
         .register_handler(KeyCode::Enter, |ui_state| ui_state.enter()).unwrap();
-        let search_handler = ConditionalHandler::new(|ui_state| ui_state.searching && !ui_state.delete);
-        let delete_handler = ConditionalHandler::new(|ui_state| ui_state.delete);
-        self.handlers = vec![main_input_handler, search_handler, delete_handler];
-        self
+        let search_handler = ConditionalHandler::new(|ui_state| ui_state.searching)
+            .register_handler(KeyCode::Esc, |ui_state| {
+                ui_state.searching = false;
+                ui_state.searchbar_content.clear();
+            }).unwrap()
+            .register_handler(KeyCode::Enter, |ui_state| {
+                ui_state.focus = Focus::MainWindow;
+                ui_state.main_window_state = MainWindowState::Results((vec![], vec![], vec![]));
+            }).unwrap()
+            .register_handler(KeyCode::Backspace, |ui_state| {ui_state.searchbar_content.pop();}).unwrap()
+            .global_handler(|ui_state, c| ui_state.searchbar_content.push(c));
+        let delete_handler = ConditionalHandler::new(|ui_state| ui_state.delete)
+            .register_handler(KeyCode::Char('y'), |ui_state| {
+                match ui_state.main_window_state.to_owned() {
+                    MainWindowState::SongFocus(s) => ui_state.music_repository.remove_song(s),
+                    MainWindowState::RecordFocus(r, _) => ui_state.music_repository.remove_album(r),
+                    MainWindowState::ArtistFocus(a, _) => ui_state.music_repository.remove_artist(a),
+                    _ => {},
+                }
+                ui_state.delete = false;
+            }).unwrap()
+        .register_handler(KeyCode::Char('n'), |ui_state| ui_state.delete = false).unwrap();
+        self.register_handler(main_input_handler)
+            .register_handler(delete_handler)
+            .register_handler(search_handler)
     }
 }
 
 pub struct ConditionalHandler {
     handlers: HashMap<KeyCode, Box<dyn Fn(&mut UiState)>>,
+    global_handler: Option<Box<dyn Fn(&mut UiState, char)>>,
     condition: Box<dyn Fn(&UiState) -> bool>
 }
 
@@ -127,7 +148,7 @@ impl ConditionalHandler {
     where
         F: Fn(&UiState) -> bool +'static
     {
-        ConditionalHandler { handlers: HashMap::new(), condition: Box::new(condition) }
+        ConditionalHandler { handlers: HashMap::new(), global_handler: None, condition: Box::new(condition) }
     }
 
     pub fn register_handler<F>(mut self, keycode: KeyCode, handler: F) -> Option<ConditionalHandler> 
@@ -142,9 +163,25 @@ impl ConditionalHandler {
         }
     }
 
+    pub fn global_handler<F>(mut self, handler: F) -> ConditionalHandler 
+    where
+        F: Fn(&mut UiState, char) + 'static
+    {
+        self.global_handler = Some(Box::new(handler));
+        self
+    }
+
     pub fn handle(&self, input: KeyEvent, ui_state: &mut UiState) {
-        if (*self.condition)(&ui_state.to_owned()) && self.handlers.contains_key(&input.code) {
-           self.handlers[&input.code](ui_state) 
+        if (*self.condition)(&ui_state.to_owned()) {
+            if let KeyCode::Char(c) = input.code {
+                match self.global_handler.as_ref() {
+                    Some(handler) => handler(ui_state, c),
+                    None => {}
+                }
+            }
+            if self.handlers.contains_key(&input.code) {
+                self.handlers[&input.code](ui_state); 
+            }
         }
     }
 }
@@ -175,68 +212,3 @@ pub fn create_input_channel() -> Receiver<Event<KeyEvent>> {
     rx
 }
 
-pub(crate) async fn handle_input(input: KeyEvent, ui_state: &mut UiState) {
-    // Match arm for inputting text
-    if ui_state.searching {
-        handle_search_input(input, ui_state).await
-    } else {
-        if !ui_state.delete {
-            // Match arm for everything else
-            match input.code {
-                _ => {}
-            }
-        } else {
-            match input.code {
-                KeyCode::Char('y') => {
-                    match ui_state.main_window_state.clone() {
-                        MainWindowState::SongFocus(s) => {
-                            let new_s = s.to_owned();
-                            thread::spawn(move || {
-                                new_s.delete();
-                            });
-                            ui_state.music_repository.remove_song(s);
-                        }
-                        MainWindowState::RecordFocus(r, _) => {
-                            let new_r = r.to_owned();
-                            thread::spawn(move || {
-                                new_r.delete();
-                            });
-                            ui_state.music_repository.remove_album(r);
-                        }
-                        MainWindowState::ArtistFocus(a, _) => {
-                            let new_a = a.to_owned();
-                            thread::spawn(move || {
-                                new_a.delete();
-                            });
-                            ui_state.music_repository.remove_artist(a);
-                        }
-                        _ => {}
-                    }
-                    ui_state.main_window_state = MainWindowState::Help;
-                    ui_state.side_menu = SideMenu::Libary(None);
-                    ui_state.delete = false;
-                }
-                KeyCode::Char('n') => ui_state.delete = false,
-                _ => {}
-            }
-        }
-    }
-}
-
-async fn handle_search_input(input: KeyEvent, ui_state: &mut UiState) {
-    match input.code {
-        KeyCode::Char(c) => ui_state.searchbar_content.push(c),
-        KeyCode::Backspace => {
-            ui_state.searchbar_content.pop();
-        }
-        KeyCode::Esc => {
-            ui_state.searching = false;
-            ui_state.searchbar_content.clear();
-        }
-        KeyCode::Enter => {
-            ui_state.focus = Focus::MainWindow;
-            ui_state.main_window_state = MainWindowState::Results((vec![], vec![], vec![]));
-        },
-        _ => {}
-    }
-}
