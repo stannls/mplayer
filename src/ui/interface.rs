@@ -1,7 +1,7 @@
 use super::components::ToolbarType;
 use super::helpers;
-use super::input::handle_input;
 use super::input::Event;
+use super::input::InputHandler;
 use crate::api::fs::MusicRepository;
 use crate::api::player::MusicPlayer;
 use crate::api::Artist;
@@ -39,6 +39,109 @@ pub(crate) struct UiState {
     pub(crate) side_menu: SideMenu,
     pub(crate) focus: Focus,
     pub(crate) delete: bool,
+    pub(crate) music_player: MusicPlayer,
+    pub(crate) music_repository: MusicRepository,
+}
+
+impl UiState {
+    pub fn scroll_down(&mut self) {
+        match self.focus {
+            Focus::MainWindow => match self.main_window_state.to_owned() {
+                MainWindowState::Results(_) => match self.focused_result {
+                    FocusedResult::Song(i) => if helpers::check_scroll_space_down(&self) {self.focused_result = FocusedResult::Song(i+1)},
+                    FocusedResult::Record(i) => if helpers::check_scroll_space_down(&self) {self.focused_result = FocusedResult::Record(i+1)},
+                    FocusedResult::Artist(i) => if helpers::check_scroll_space_down(&self) {self.focused_result = FocusedResult::Artist(i+1)},
+                    _ => {}
+                },
+                MainWindowState::ArtistFocus(a, i) => {
+                    if i.is_some() && a.get_albums().len() - i.unwrap() > 1 {
+                        self.main_window_state = MainWindowState::ArtistFocus(a, i.map(|v| v+1));
+                    } else if i.is_none() && a.get_albums().len() > 0 {
+                        self.main_window_state = MainWindowState::ArtistFocus(a, Some(0));
+                    }
+                },
+                MainWindowState::RecordFocus(r, i) => {
+                    if i.is_some() && r.get_songs().len() - i.unwrap() > 1 {
+                        self.main_window_state = MainWindowState::RecordFocus(r, i.map(|v| v+1));
+                    } else if i.is_none() && r.get_songs().len() > 0 {
+                        self.main_window_state = MainWindowState::RecordFocus(r, Some(0));
+                    }
+                },
+                _ => {}
+            },
+            Focus::SideWindow => match self.side_menu {
+               SideMenu::Libary(i) => if i.is_some() && self.artists.len() - i.unwrap() > 1 {
+                   self.side_menu = SideMenu::Libary(i.map(|v| v+1));
+               } else {
+                    self.side_menu = SideMenu::Libary(Some(0));
+               },
+               _ => {}
+            },
+            _ => {}
+        }
+    }
+    pub fn scroll_up(&mut self) {
+        match self.focus {
+            Focus::MainWindow => match self.main_window_state.to_owned() {
+                MainWindowState::Results(_) => match self.focused_result.to_owned() {
+                    FocusedResult::Song(i) => if i > 0 {self.focused_result = FocusedResult::Song(i - 1)},
+                    FocusedResult::Record(i) => if i > 0 {self.focused_result = FocusedResult::Record(i - 1)},
+                    FocusedResult::Artist(i) => if i > 0 {self.focused_result = FocusedResult::Artist(i - 1)},
+                    _ => {}
+                },
+                MainWindowState::ArtistFocus(a, i) => if i.is_some() {
+                    if i.unwrap() > 0 {
+                        self.main_window_state = MainWindowState::ArtistFocus(a, i.map(|v| v-1));
+                    } else {
+                        self.main_window_state = MainWindowState::ArtistFocus(a, None);
+                    }
+                },
+                MainWindowState::RecordFocus(r, i) => if i.is_some() {
+                    if i.unwrap() > 0 {
+                        self.main_window_state = MainWindowState::RecordFocus(r, i.map(|v| v-1));
+                    } else {
+                        self.main_window_state = MainWindowState::RecordFocus(r, None);
+                    }
+                },
+                _ => {}
+            },
+            Focus::SideWindow => match self.side_menu {
+                SideMenu::Libary(i) => if i.is_some() {
+                    if i.unwrap() > 0 {self.side_menu = SideMenu::Libary(i.map(|v| v-1))}
+                    else {self.side_menu = SideMenu::Libary(None)}
+                },
+                _ => {}
+            },
+            _ => {}
+        } 
+    }
+    pub fn enter(&mut self) {
+        match self.focus {
+            Focus::MainWindow => match self.main_window_state.to_owned() {
+                MainWindowState::ArtistFocus(a, i) => if i.is_some() {
+                    self.history.push_front(self.main_window_state.to_owned());
+                    self.main_window_state = MainWindowState::RecordFocus(a.get_albums().get(i.unwrap()).unwrap().to_owned(), None);
+                },
+                MainWindowState::RecordFocus(r, i) => if i.is_some() {
+                    self.history.push_front(self.main_window_state.to_owned());
+                    self.main_window_state = MainWindowState::SongFocus(r.get_songs().get(i.unwrap()).unwrap().to_owned());
+                },
+                _ => {}
+            },
+            Focus::SideWindow => {
+                match self.side_menu {
+                    SideMenu::Libary(i) => if i.is_some() {
+                        self.history.push_front(self.main_window_state.to_owned());
+                        self.focus = Focus::MainWindow;
+                        self.side_menu = SideMenu::Libary(None);
+                        self.main_window_state = MainWindowState::ArtistFocus(self.artists.get(i.unwrap()).unwrap().to_owned(), None);
+                    },
+                    _ => {}
+                }
+            },
+            _ => {}
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -75,7 +178,7 @@ pub enum Focus {
 }
 
 impl UiState {
-    fn new() -> UiState {
+    fn new(music_player: MusicPlayer, music_repository: MusicRepository) -> UiState {
         UiState {
             searching: false,
             searchbar_content: String::from(""),
@@ -87,6 +190,8 @@ impl UiState {
             side_menu: SideMenu::Libary(None),
             focus: Focus::None,
             delete: false,
+            music_player,
+            music_repository,
         }
     }
 }
@@ -121,17 +226,22 @@ pub async fn render_interface(
     rx: Receiver<Event<KeyEvent>>,
 ) {
     // Init for ui state and the downloader
-    let mut ui_state = UiState::new();
     let music_player = MusicPlayer::new();
     let music_dir = dirs::audio_dir().unwrap();
     let mut music_repository = MusicRepository::new(music_dir);
-    let _ = music_repository.load_cached_artists();
+    
+    let _ = music_repository.load_cached_artists(); 
     music_repository.watch_files();
+
+    let mut ui_state = UiState::new(music_player, music_repository);
+
+    let handler = InputHandler::new().load_input_handlers();
+
     // Main UI render loop
     while !ui_state.quit {
         terminal
             .draw(|f| {
-                let current_song = music_player.get_song_info();
+                let current_song = ui_state.music_player.get_song_info();
 
                 // Layouting
                 let size = f.size();
@@ -168,7 +278,7 @@ pub async fn render_interface(
                     ),
                     SideMenu::Queue(i) => f.render_widget(
                         components::build_queue(
-                            music_player.get_queue(),
+                            ui_state.music_player.get_queue(),
                             i,
                             content_layout[0].height as usize - 3,
                         ),
@@ -304,7 +414,7 @@ pub async fn render_interface(
                         play_layout[1],
                     )
                 }
-                ui_state.artists = music_repository.get_artists();
+                ui_state.artists = ui_state.music_repository.get_artists();
                 if ui_state.delete {
                     let text = vec![
                         Spans::from(vec![Span::raw(
@@ -330,11 +440,9 @@ pub async fn render_interface(
 
         // Handles keyboard input
         match rx.recv().unwrap() {
-            Event::Input(event) => {
-                handle_input(event, &mut ui_state, &music_player, &mut music_repository).await
-            }
+            Event::Input(event) => handler.handle(event, &mut ui_state),
             _ => {}
         }
     }
-    let _ = music_repository.cache_artists();
+    let _ = ui_state.music_repository.cache_artists();
 }
