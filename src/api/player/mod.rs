@@ -18,7 +18,7 @@ use super::{Album, Song};
 // This struct represents all possible interactions with the music player
 pub enum MusicPlayerEvent {
     Stop,
-    Play((Decoder<BufReader<File>>, SongInfo)),
+    Play(Box<(Decoder<BufReader<File>>, SongInfo)>),
     Skip,
     Pause,
     Volume(f32),
@@ -180,7 +180,7 @@ impl MusicPlayer {
             self.stop();
         }
         self.sender
-            .send(MusicPlayerEvent::Play((
+            .send(MusicPlayerEvent::Play(Box::new((
                 source,
                 SongInfo::new(
                     song.get_title(),
@@ -188,7 +188,7 @@ impl MusicPlayer {
                     song.get_album_name(),
                     song.get_length_secs().unwrap(),
                 ),
-            )))
+            ))))
             .unwrap();
     }
     // Emptys queue, enqueues album
@@ -200,7 +200,7 @@ impl MusicPlayer {
             let file = BufReader::new(File::open(song.get_filepath().unwrap()).unwrap());
             let source = Decoder::new(file).unwrap();
             self.sender
-                .send(MusicPlayerEvent::Play((
+                .send(MusicPlayerEvent::Play(Box::new((
                     source,
                     SongInfo::new(
                         song.get_title(),
@@ -208,7 +208,7 @@ impl MusicPlayer {
                         song.get_album_name(),
                         song.get_length_secs().unwrap(),
                     ),
-                )))
+                ))))
                 .unwrap();
         }
     }
