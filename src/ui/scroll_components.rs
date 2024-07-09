@@ -1,19 +1,20 @@
-use tui::{
-    style::{Modifier, Style},
-    widgets::{Row, Table},
+use ratatui::{
+    layout::Constraint, style::{Modifier, Style}, widgets::{Row, Table}
 };
 
 pub struct ScrollTable {
     content: Vec<Vec<String>>,
+    constraints: Vec<Constraint>,
     content_range: (usize, usize),
     focused: Option<usize>,
     selected: Option<usize>,
     displayable_results: usize,
 }
 impl ScrollTable {
-    pub fn new(content: Vec<Vec<String>>) -> ScrollTable {
+    pub fn new(content: Vec<Vec<String>>, constraints: Vec<Constraint>) -> ScrollTable {
         ScrollTable {
             content,
+            constraints,
             content_range: (0, 0),
             focused: None,
             selected: None,
@@ -79,6 +80,6 @@ impl ScrollTable {
             }
         }
         items.drain(0..self.content_range.0);
-        Table::new(items)
+        Table::new(items, &self.constraints)
     }
 }

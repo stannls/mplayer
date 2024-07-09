@@ -1,6 +1,6 @@
 use crate::ui::interface::{MainWindowState, UiState};
 use super::interface::FocusedResult;
-use tui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub(crate) fn check_scroll_space_down(ui_state: &UiState) -> bool {
     match ui_state.main_window_state.clone() {

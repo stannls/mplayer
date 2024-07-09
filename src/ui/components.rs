@@ -3,11 +3,11 @@ use std::collections::VecDeque;
 use super::scroll_components::ScrollTable;
 use crate::api::{player::SongInfo, Album, Artist, Song};
 
-use tui::{
+use ratatui::{
     layout::Constraint,
     style::{Color, Modifier, Style},
     text::Span,
-    text::Spans,
+    text::Line,
     widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table},
 };
 
@@ -29,12 +29,11 @@ pub fn build_libary(
     displayable_results: usize,
 ) -> Table<'static> {
     let rows = content.into_iter().map(|f| vec![f]).collect();
-    ScrollTable::new(rows)
+    ScrollTable::new(rows, vec![Constraint::Percentage(100)])
         .focus(index)
         .displayable_results(displayable_results)
         .render()
         .block(Block::default().borders(Borders::all()).title("[L]ibary"))
-        .widths(&[Constraint::Percentage(100)])
 }
 
 // The welcome window
@@ -68,8 +67,7 @@ pub fn build_help_window() -> Table<'static> {
         Row::new(vec!["d", "Download media"]),
         Row::new(vec!["p", "Play media"]),
         Row::new(vec!["e", "Enqueue media"]),
-    ])
-    .widths(&[Constraint::Percentage(20), Constraint::Percentage(80)])
+    ], &[Constraint::Percentage(20), Constraint::Percentage(80)])
     .block(Block::default().borders(Borders::ALL).title("Help"))
 }
 
@@ -112,12 +110,11 @@ pub fn build_result_box<T: SearchEntity>(
     displayable_results: usize,
 ) -> Table<'static> {
     let items = content.into_iter().map(|f| vec![f.display()]).collect();
-    ScrollTable::new(items)
+    ScrollTable::new(items, vec![Constraint::Percentage(100)])
         .focus(focused_result)
         .displayable_results(displayable_results)
         .render()
         .block(Block::default().borders(Borders::all()).title(title))
-        .widths(&[Constraint::Percentage(100)])
 }
 
 pub fn build_artist_focus(
@@ -130,7 +127,7 @@ pub fn build_artist_focus(
         rows.push(vec![r.get_name(), r.get_release_date()]);
     }
 
-    ScrollTable::new(rows)
+    ScrollTable::new(rows, vec![Constraint::Max(u16::MAX), Constraint::Length(20)])
         .focus(index)
         .displayable_results(displayable_results)
         .render()
@@ -140,7 +137,6 @@ pub fn build_artist_focus(
                 .title(artist.get_name()),
         )
         .header(Row::new(vec!["Title", "Release Date"]))
-        .widths(&[Constraint::Max(u16::MAX), Constraint::Length(20)])
 }
 
 pub fn build_song_focus(song: Box<dyn Song>) -> Table<'static> {
@@ -162,18 +158,17 @@ pub fn build_song_focus(song: Box<dyn Song>) -> Table<'static> {
         title,
         song.get_length().unwrap_or("00:00".to_string()),
     ]);
-    return Table::new(vec![content])
+    return Table::new(vec![content], &[
+            Constraint::Length(3),
+            Constraint::Max(u16::MAX),
+            Constraint::Length(8),
+        ])
         .block(
             Block::default()
                 .borders(Borders::all())
                 .title(song.get_title()),
         )
         .header(Row::new(vec!["#", "Title", "Length"]))
-        .widths(&[
-            Constraint::Length(3),
-            Constraint::Max(u16::MAX),
-            Constraint::Length(8),
-        ]);
 }
 
 pub fn build_record_focus(
@@ -202,7 +197,7 @@ pub fn build_record_focus(
         })
         .collect();
 
-    ScrollTable::new(rows)
+    ScrollTable::new(rows, vec![Constraint::Length(3), Constraint::Max(u16::MAX), Constraint::Length(8)])
         .focus(index)
         .selected(playing)
         .displayable_results(displayable_results)
@@ -213,21 +208,16 @@ pub fn build_record_focus(
                 .borders(Borders::all())
                 .title(record.get_name()),
         )
-        .widths(&[
-            Constraint::Length(3),
-            Constraint::Max(u16::MAX),
-            Constraint::Length(8),
-        ])
 }
 
 pub fn build_song_info(song_info: &SongInfo) -> Paragraph<'static> {
     Paragraph::new(vec![
-        Spans::from(format!("{} - {}", song_info.name, song_info.artist)),
-        Spans::from(vec![
+        Line::from(format!("{} - {}", song_info.name, song_info.artist)),
+        Line::from(vec![
             Span::styled("on ", Style::default().add_modifier(Modifier::ITALIC)),
             Span::raw(song_info.album.to_owned()),
         ]),
-        Spans::from(format!(
+        Line::from(format!(
             "{}/{}",
             song_info.played_time().unwrap(),
             song_info.length
@@ -259,10 +249,9 @@ pub fn build_queue(
     index: Option<usize>,
     displayable_results: usize,
 ) -> Table<'static> {
-    ScrollTable::new(q.into_iter().map(|f| vec![f.name]).collect())
+    ScrollTable::new(q.into_iter().map(|f| vec![f.name]).collect(), vec![Constraint::Percentage(100)])
         .focus(index)
         .displayable_results(displayable_results)
         .render()
         .block(Block::default().borders(Borders::all()).title("[Q]ueue"))
-        .widths(&[Constraint::Percentage(100)])
 }

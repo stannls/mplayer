@@ -17,15 +17,15 @@ use itertools::Itertools;
 use std::collections::VecDeque;
 use std::io;
 use std::{io::Stdout, sync::mpsc::Receiver};
-use tui::style::Modifier;
-use tui::style::Style;
-use tui::text::Span;
-use tui::text::Spans;
-use tui::widgets::Block;
-use tui::widgets::Borders;
-use tui::widgets::Clear;
-use tui::widgets::Paragraph;
-use tui::{backend::CrosstermBackend, Terminal};
+use ratatui::style::Modifier;
+use ratatui::style::Style;
+use ratatui::text::Span;
+use ratatui::text::Line;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Clear;
+use ratatui::widgets::Paragraph;
+use ratatui::{backend::CrosstermBackend, Terminal};
 
 #[derive(Clone)]
 pub(crate) struct UiState {
@@ -417,11 +417,11 @@ pub async fn render_interface(
                 ui_state.artists = ui_state.music_repository.get_artists();
                 if ui_state.delete {
                     let text = vec![
-                        Spans::from(vec![Span::raw(
+                        Line::from(vec![Span::raw(
                             "Are you sure that you want to delete that?",
                         )]),
-                        Spans::from(vec![]),
-                        Spans::from(vec![
+                        Line::from(vec![]),
+                        Line::from(vec![
                             Span::styled("[y]es", Style::default().add_modifier(Modifier::BOLD)),
                             Span::styled(" [n]o", Style::default().add_modifier(Modifier::BOLD)),
                         ]),

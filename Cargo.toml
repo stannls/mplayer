@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 crossterm = "0.27.0"
 tokio = {version = "1.38.0", features = ["full"]}
-tui = {package = "ratatui", version = "0.20.1"}
 chrono = "0.4.38"
 serde = {version = "1.0.203", features = ["derive"]}
 regex = "1.10.5"
@@ -25,3 +24,4 @@ string_cache = "0.8.7"
 itertools = "0.13.0"
 serde_json = "1.0.120"
 infer = "0.16.0"
+ratatui = "0.27.0"

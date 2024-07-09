@@ -1,4 +1,4 @@
-use tui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn build_main_layout(playing: bool) -> Layout {
     if playing {
