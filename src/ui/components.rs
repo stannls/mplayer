@@ -145,12 +145,12 @@ pub fn build_song_focus(song: Box<dyn Song>) -> Table<'static> {
         song.get_title(),
         match song.get_disambiguation() {
             Some(str) =>
-                if str != "" {
+                if !str.is_empty() {
                     format!(" ({})", str)
                 } else {
-                    format!("")
+                    String::new()
                 },
-            _ => format!(""),
+            _ => String::new(),
         }
     );
     let content = Row::new(vec![

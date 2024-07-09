@@ -48,22 +48,22 @@ impl UiState {
         match self.focus {
             Focus::MainWindow => match self.main_window_state.to_owned() {
                 MainWindowState::Results(_) => match self.focused_result {
-                    FocusedResult::Song(i) => if helpers::check_scroll_space_down(&self) {self.focused_result = FocusedResult::Song(i+1)},
-                    FocusedResult::Record(i) => if helpers::check_scroll_space_down(&self) {self.focused_result = FocusedResult::Record(i+1)},
-                    FocusedResult::Artist(i) => if helpers::check_scroll_space_down(&self) {self.focused_result = FocusedResult::Artist(i+1)},
+                    FocusedResult::Song(i) => if helpers::check_scroll_space_down(self) {self.focused_result = FocusedResult::Song(i+1)},
+                    FocusedResult::Record(i) => if helpers::check_scroll_space_down(self) {self.focused_result = FocusedResult::Record(i+1)},
+                    FocusedResult::Artist(i) => if helpers::check_scroll_space_down(self) {self.focused_result = FocusedResult::Artist(i+1)},
                     _ => {}
                 },
                 MainWindowState::ArtistFocus(a, i) => {
                     if i.is_some() && a.get_albums().len() - i.unwrap() > 1 {
                         self.main_window_state = MainWindowState::ArtistFocus(a, i.map(|v| v+1));
-                    } else if i.is_none() && a.get_albums().len() > 0 {
+                    } else if i.is_none() && !a.get_albums().is_empty() {
                         self.main_window_state = MainWindowState::ArtistFocus(a, Some(0));
                     }
                 },
                 MainWindowState::RecordFocus(r, i) => {
                     if i.is_some() && r.get_songs().len() - i.unwrap() > 1 {
                         self.main_window_state = MainWindowState::RecordFocus(r, i.map(|v| v+1));
-                    } else if i.is_none() && r.get_songs().len() > 0 {
+                    } else if i.is_none() && !r.get_songs().is_empty() {
                         self.main_window_state = MainWindowState::RecordFocus(r, Some(0));
                     }
                 },
@@ -129,15 +129,12 @@ impl UiState {
                 _ => {}
             },
             Focus::SideWindow => {
-                match self.side_menu {
-                    SideMenu::Libary(i) => if i.is_some() {
-                        self.history.push_front(self.main_window_state.to_owned());
-                        self.focus = Focus::MainWindow;
-                        self.side_menu = SideMenu::Libary(None);
-                        self.main_window_state = MainWindowState::ArtistFocus(self.artists.get(i.unwrap()).unwrap().to_owned(), None);
-                    },
-                    _ => {}
-                }
+                if let SideMenu::Libary(i) = self.side_menu { if i.is_some() {
+                    self.history.push_front(self.main_window_state.to_owned());
+                    self.focus = Focus::MainWindow;
+                    self.side_menu = SideMenu::Libary(None);
+                    self.main_window_state = MainWindowState::ArtistFocus(self.artists.get(i.unwrap()).unwrap().to_owned(), None);
+                }}
             },
             _ => {}
         }
@@ -267,8 +264,8 @@ pub async fn render_interface(
                         components::build_libary(
                             ui_state
                                 .artists
-                                .to_owned()
-                                .into_iter()
+                                .iter()
+                                .cloned()
                                 .map(|f| f.get_name())
                                 .collect_vec(),
                             i,
@@ -439,10 +436,7 @@ pub async fn render_interface(
             .unwrap();
 
         // Handles keyboard input
-        match rx.recv().unwrap() {
-            Event::Input(event) => handler.handle(event, &mut ui_state),
-            _ => {}
-        }
+        if let Event::Input(event) = rx.recv().unwrap() { handler.handle(event, &mut ui_state) }
     }
     let _ = ui_state.music_repository.cache_artists();
 }

@@ -33,8 +33,6 @@ impl ScrollTable {
         self.displayable_results = r;
         if self.content_range.1 - self.content_range.0 > r {
             self.content_range.1 = self.content_range.0 + r;
-        } else if self.content_range.1 - self.content_range.0 < r {
-            self.content_range.1 = self.content_range.0 + r;
         }
         self
     }
@@ -43,7 +41,7 @@ impl ScrollTable {
             .content
             .clone()
             .into_iter()
-            .map(|f| Row::new(f))
+            .map(Row::new)
             .collect::<Vec<Row>>();
         if self.focused.is_some() && self.focused.unwrap() < items.len() {
             items[self.focused.unwrap()] = items

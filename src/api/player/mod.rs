@@ -86,7 +86,7 @@ pub struct MusicPlayer {
 }
 
 impl MusicPlayer {
-    pub fn new<'a>() -> MusicPlayer {
+    pub fn new() -> MusicPlayer {
         let (tx, rx) = mpsc::channel::<MusicPlayerEvent>();
         let played_song = Arc::new(Mutex::new(None));
         let queue = Arc::new(Mutex::new(VecDeque::new()));

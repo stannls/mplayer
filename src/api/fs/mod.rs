@@ -33,7 +33,7 @@ impl MusicRepository {
         files
             .into_iter()
             // Convert filesystem path into song struct containing metadata
-            .map(|f| FsSong::new(f))
+            .map( FsSong::new)
             // Ignore invalid files and convert valid ones into Song trait
             .filter(|f| f.is_some())
             .map(|f| Box::new(f.unwrap()) as Box<dyn Song + Send + Sync>)
@@ -72,7 +72,7 @@ impl MusicRepository {
         let mut artists = cloned.artists.lock().unwrap();
         let artist_index = artists
             .iter()
-            .position(|x| *x.get_name() == album.get_songs().get(0).unwrap().get_artist_name())
+            .position(|x| *x.get_name() == album.get_songs().first().unwrap().get_artist_name())
             .unwrap();
 
         let artist = artists.get(artist_index).unwrap();
@@ -352,32 +352,32 @@ impl FsAlbum {
 impl Album for FsAlbum {
     fn get_name(&self) -> String {
         self.songs
-            .to_owned()
-            .into_iter()
+            .iter()
+            .cloned()
             .map(|f| f.get_album_name())
             .collect::<Vec<String>>()
-            .get(0)
+            .first()
             .unwrap_or(&"".to_string())
             .to_owned()
     }
     fn get_artist_name(&self) -> String {
         self.songs
-            .to_owned()
-            .into_iter()
+            .iter()
+            .cloned()
             .map(|f| f.get_artist_name())
             .collect::<Vec<String>>()
-            .get(0)
+            .first()
             .unwrap_or(&"".to_string())
             .to_owned()
     }
     fn get_release_date(&self) -> String {
         self.songs
-            .to_owned()
-            .into_iter()
+            .iter()
+            .cloned()
             .map(|f| f.get_release_date())
             .filter(|f| f.is_some())
             .collect::<Vec<Option<String>>>()
-            .get(0)
+            .first()
             .unwrap_or(&None)
             .to_owned()
             .unwrap_or("".to_string())
@@ -420,12 +420,12 @@ pub struct FsSong {
 
 impl FsSong {
     pub fn new(path: PathBuf) -> Option<FsSong> {
-        let extension = infer::get_from_path(path.to_owned()).ok()??.extension();
+        let extension = infer::get_from_path(&path).ok()??.extension();
         if !(extension == "mp3" || extension == "flac" || extension == "wav" || extension == "m4a")
         {
             return None;
         }
-        let tags = Tag::new().read_from_path(path.to_owned()).ok()?;
+        let tags = Tag::new().read_from_path(&path).ok()?;
         Some(FsSong {
             path: path.to_owned(),
             title: tags.title()?.to_string(),

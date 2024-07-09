@@ -105,7 +105,7 @@ impl InputHandler {
         }).unwrap()
         .register_handler(KeyCode::Down, |ui_state| ui_state.scroll_down()).unwrap()
         .register_handler(KeyCode::Up, |ui_state| ui_state.scroll_up()).unwrap()
-        .register_handler(KeyCode::Char('b'), |ui_state| if matches!(ui_state.focus, Focus::MainWindow) && ui_state.history.len() > 0 {
+        .register_handler(KeyCode::Char('b'), |ui_state| if matches!(ui_state.focus, Focus::MainWindow) && !ui_state.history.is_empty() {
             ui_state.main_window_state = ui_state.history.pop_front().unwrap();
         }).unwrap() 
         .register_handler(KeyCode::Enter, |ui_state| ui_state.enter()).unwrap();
@@ -155,11 +155,11 @@ impl ConditionalHandler {
     where
         F: Fn(&mut UiState) + 'static
     {
-        if self.handlers.contains_key(&keycode) {
-            None
-        } else {
-            self.handlers.insert(keycode, Box::new(handler));
+        if let std::collections::hash_map::Entry::Vacant(e) = self.handlers.entry(keycode) {
+            e.insert(Box::new(handler));
             Some(self)
+        } else {
+            None
         }
     }
 
@@ -202,10 +202,8 @@ pub fn create_input_channel() -> Receiver<Event<KeyEvent>> {
                 }
             }
 
-            if last_tick.elapsed() >= tick_rate {
-                if let Ok(_) = tx.send(Event::Tick) {
-                    last_tick = Instant::now();
-                }
+            if last_tick.elapsed() >= tick_rate && tx.send(Event::Tick).is_ok() {
+                last_tick = Instant::now();
             }
         }
     });

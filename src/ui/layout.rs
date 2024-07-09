@@ -33,22 +33,22 @@ pub fn build_search_layout(parent_layout: Rect) -> Vec<Rect> {
         .direction(Direction::Horizontal)
         .margin(0)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(parent_layout.to_owned());
+        .split(parent_layout);
     Layout::default()
         .direction(Direction::Vertical)
         .margin(0)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(split[0])
-        .into_iter()
+        .iter()
         .chain(
             Layout::default()
                 .direction(Direction::Vertical)
                 .margin(0)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .split(split[1])
-                .into_iter(),
+                .iter(),
         )
-        .map(|f| *f)
+        .copied()
         .collect()
 }
 
